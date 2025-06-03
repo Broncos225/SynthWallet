@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
+import { TransactionFAB } from '@/components/shared/transaction-fab';
 
 export default function RecurringTransactionsPage() {
   const {
@@ -106,7 +107,7 @@ export default function RecurringTransactionsPage() {
     setTransactionToPrefillFromRecurring(prefillData);
 
     console.log("RecurringPage: Navigating to home page (/)");
-    router.push('/');
+    router.push('/'); // Navigate to dashboard where TransactionFAB will pick up the prefill
     toast({ title: "Recordatorio Procesado", description: `"${record.name}" marcado como procesado. Se ha preparado una nueva transacción.`});
   };
 
@@ -179,6 +180,8 @@ export default function RecurringTransactionsPage() {
         </Card>
       )}
 
+      <TransactionFAB />
+
       <AlertDialog open={!!recordToDelete} onOpenChange={() => setRecordToDelete(undefined)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -198,4 +201,3 @@ export default function RecurringTransactionsPage() {
     </div>
   );
 }
-

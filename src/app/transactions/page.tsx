@@ -29,22 +29,22 @@ import { useAppData } from '@/contexts/app-data-context';
 import type { Transaction } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
+import { TransactionFAB } from '@/components/shared/transaction-fab';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function TransactionsPage() {
   const { transactions, deleteTransaction, dataLoading } = useAppData();
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false); // Renamed from isFormOpen
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | undefined>(undefined);
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
   
-  const dialogTitleText = transactionToEdit ? "Editar Transacción" : "Añadir Nueva Transacción";
-  const dialogDescriptionText = transactionToEdit 
-    ? "Actualiza los detalles de tu transacción."
-    : "Introduce los detalles de tu nueva transacción (gasto o ingreso).";
+  const dialogTitleText = "Editar Transacción"; // FAB handles new
+  const dialogDescriptionText = "Actualiza los detalles de tu transacción.";
 
   const handleEdit = (transaction: Transaction) => {
     setTransactionToEdit(transaction);
-    setIsFormOpen(true);
+    setIsEditFormOpen(true);
   };
 
   const handleDeleteConfirm = (transactionId: string) => {
@@ -60,12 +60,12 @@ export default function TransactionsPage() {
   };
 
   const handleFormSave = () => {
-    setIsFormOpen(false);
+    setIsEditFormOpen(false);
     setTransactionToEdit(undefined); 
   };
   
   const handleDialogClose = () => {
-    setIsFormOpen(false);
+    setIsEditFormOpen(false);
     setTransactionToEdit(undefined); 
   };
 
@@ -75,11 +75,7 @@ export default function TransactionsPage() {
         <PageHeader
           title="Transacciones"
           description="Registra y gestiona tus gastos e ingresos."
-          actions={
-            <Button disabled>
-              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Transacción
-            </Button>
-          }
+          // Removed actions, FAB will handle adding
         />
         <Skeleton className="w-full h-[300px]" />
       </div>
@@ -92,31 +88,7 @@ export default function TransactionsPage() {
       <PageHeader
         title="Transacciones"
         description="Registra y gestiona tus gastos e ingresos."
-        actions={
-          <Dialog open={isFormOpen} onOpenChange={(open) => {
-            if (!open) handleDialogClose();
-            else setIsFormOpen(true);
-          }}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { setTransactionToEdit(undefined); setIsFormOpen(true); }}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Transacción
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md" aria-label={dialogTitleText}>
-              <DialogHeader>
-                <DialogTitle>{dialogTitleText}</DialogTitle>
-                <DialogDescription>
-                  {dialogDescriptionText}
-                </DialogDescription>
-              </DialogHeader>
-              <TransactionForm
-                transactionToEdit={transactionToEdit} 
-                onSave={handleFormSave} 
-                dialogClose={handleDialogClose} 
-              />
-            </DialogContent>
-          </Dialog>
-        }
+        // Removed original "Añadir Transacción" button; FAB handles this now.
       />
       
       <TransactionTable
@@ -125,6 +97,30 @@ export default function TransactionsPage() {
         onDelete={handleDeleteConfirm}
         isLoading={dataLoading}
       />
+
+      <TransactionFAB />
+
+      {/* Dialog for Editing Transactions */}
+      <Dialog open={isEditFormOpen} onOpenChange={(open) => {
+        if (!open) handleDialogClose();
+        else setIsEditFormOpen(true);
+      }}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col" aria-label={dialogTitleText}>
+          <DialogHeader>
+            <DialogTitle>{dialogTitleText}</DialogTitle>
+            <DialogDescription>
+              {dialogDescriptionText}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-grow overflow-y-auto pr-6 -mr-6">
+            <TransactionForm
+              transactionToEdit={transactionToEdit} 
+              onSave={handleFormSave} 
+              dialogClose={handleDialogClose} 
+            />
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!transactionToDeleteId} onOpenChange={() => setTransactionToDeleteId(undefined)}>
         <AlertDialogContent>
@@ -145,5 +141,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    

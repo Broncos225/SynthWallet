@@ -31,6 +31,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TransactionFAB } from '@/components/shared/transaction-fab';
 
 export default function SavingGoalsPage() {
   const { savingGoals, deleteSavingGoal, dataLoading } = useAppData();
@@ -139,6 +140,8 @@ export default function SavingGoalsPage() {
           </CardContent>
         </Card>
       )}
+
+      <TransactionFAB />
 
       <AlertDialog open={!!goalToDelete} onOpenChange={() => setGoalToDelete(undefined)}>
         <AlertDialogContent>

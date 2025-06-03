@@ -33,6 +33,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { TransactionFAB } from '@/components/shared/transaction-fab';
 
 export default function DebtsPage() {
   const { debts, deleteDebt, dataLoading, getTransactionsForDebt, accounts } = useAppData();
@@ -248,6 +249,8 @@ export default function DebtsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <TransactionFAB />
 
       {/* Debt Transaction Form Dialog */}
       {debtForTransaction && (

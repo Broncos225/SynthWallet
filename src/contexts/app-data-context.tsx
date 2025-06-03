@@ -171,11 +171,32 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         const themeSettingsRef = ref(db, dataPaths.themeSettings);
 
         const catSnapshot = await get(categoriesRef);
-        if (!catSnapshot.exists() || Object.keys(catSnapshot.val() || {}).length === 0) {
-          const initialCategoriesObject: {[key: string]: Category} = {};
-          INITIAL_CATEGORIES.forEach(cat => { initialCategoriesObject[cat.id] = cat; });
-          await set(categoriesRef, initialCategoriesObject);
+        let currentCategoriesData = catSnapshot.val() || {};
+        let categoriesChanged = false;
+
+        if (Object.keys(currentCategoriesData).length === 0) {
+          INITIAL_CATEGORIES.forEach(cat => { currentCategoriesData[cat.id] = cat; });
+          categoriesChanged = true;
+        } else {
+          // Ensure reserved categories exist and are correctly configured
+          RESERVED_CATEGORY_IDS.forEach(reservedId => {
+            const initialReservedCat = INITIAL_CATEGORIES.find(cat => cat.id === reservedId);
+            if (initialReservedCat) {
+              if (!currentCategoriesData[reservedId]) {
+                currentCategoriesData[reservedId] = initialReservedCat;
+                categoriesChanged = true;
+              } else if (reservedId === 'income' && currentCategoriesData[reservedId].parentId) {
+                // Correct 'income' category if it somehow has a parentId
+                currentCategoriesData[reservedId].parentId = null;
+                categoriesChanged = true;
+              }
+            }
+          });
         }
+        if (categoriesChanged) {
+          await set(categoriesRef, currentCategoriesData);
+        }
+
 
         const accSnapshot = await get(accountsRef);
         if (!accSnapshot.exists() || Object.keys(accSnapshot.val() || {}).length === 0) {
@@ -198,12 +219,35 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             setBudgets(Object.values(snapshot.val() || {}));
           }),
           onValue(ref(db, dataPaths.categories), (snapshot) => {
-              const dbCategories = snapshot.val();
-              if (dbCategories && Object.keys(dbCategories).length > 0) {
-                   setCategories(Object.values(dbCategories).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+              let loadedCategories: Category[] = [];
+              const dbCategoriesSnapshot = snapshot.val();
+
+              if (dbCategoriesSnapshot && Object.keys(dbCategoriesSnapshot).length > 0) {
+                  loadedCategories = Object.values(dbCategoriesSnapshot);
               } else {
-                  setCategories(INITIAL_CATEGORIES.sort((a,b) => a.name.localeCompare(b.name)));
+                  // This case implies the node is null/undefined or truly empty (e.g. right after ensureInitialData failed or was cleared)
+                  // We rely on ensureInitialData to have populated it, or use INITIAL_CATEGORIES as a fallback.
+                  loadedCategories = [...INITIAL_CATEGORIES];
               }
+
+              // Defensive check: Ensure reserved categories are present in the local state
+              // This primarily handles cases where Firebase might be slow to reflect writes from ensureInitialData,
+              // or if data got corrupted/partially deleted.
+              RESERVED_CATEGORY_IDS.forEach(reservedId => {
+                  if (!loadedCategories.find(cat => cat.id === reservedId)) {
+                      const initialReservedCat = INITIAL_CATEGORIES.find(cat => cat.id === reservedId);
+                      if (initialReservedCat) {
+                          loadedCategories.push(initialReservedCat);
+                      }
+                  }
+              });
+              // Ensure 'income' category has no parentId if it exists from DB
+              const incomeCatIndex = loadedCategories.findIndex(cat => cat.id === 'income');
+              if (incomeCatIndex > -1 && loadedCategories[incomeCatIndex].parentId) {
+                  console.warn("Correcting 'income' category to not have a parentId in local state.");
+                  loadedCategories[incomeCatIndex].parentId = null;
+              }
+              setCategories(loadedCategories.sort((a: Category, b: Category) => a.name.localeCompare(b.name)));
           }),
           onValue(ref(db, dataPaths.expenseTemplates), (snapshot) => {
             setExpenseTemplates(Object.values(snapshot.val() || {}).sort((a: any, b: any) => a.name.localeCompare(b.name)));
@@ -1153,9 +1197,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     addAccount, updateAccount, deleteAccount, getAccountById, getAccountByName, getAccountName, isAccountInUse,
     addDebt, getDebtById, addDebtTransaction, deleteDebtTransaction, getTransactionsForDebt, deleteDebt,
     updateThemeSettings, formatUserCurrency,
-    addSavingGoal, updateSavingGoal, deleteSavingGoal, getSavingGoalById, getSavingGoalByName, getSavingGoalName, getTransactionsForSavingGoal, // Added dependency
+    addSavingGoal, updateSavingGoal, deleteSavingGoal, getSavingGoalById, getSavingGoalByName, getSavingGoalName, getTransactionsForSavingGoal,
     addRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, getRecurringTransactionById, processRecurringTransactionAsDone, setTransactionToPrefillFromRecurring,
-    transactionsBySavingGoal // Added dependency for the memoized map itself
+    transactionsBySavingGoal
   ]);
 
   return (

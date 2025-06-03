@@ -7,9 +7,9 @@ import { SpendingPieChart } from '@/components/reports/spending-pie-chart';
 import { BudgetListItem } from '@/components/budgets/budget-list-item';
 import { TransactionTable } from '@/components/transactions/transaction-table';
 import { useAppData } from '@/contexts/app-data-context';
-import type { Transaction, Budget, Account, TransactionType } from '@/types';
+import type { Transaction, Budget, Account } from '@/types';
 import { getMonthYear, formatDate } from '@/lib/utils';
-import { DollarSign, ListChecks, AlertTriangle, Wallet, Plus, Info, TrendingDown, TrendingUp, ArrowRightLeft, X as CloseIcon, Download } from 'lucide-react';
+import { DollarSign, ListChecks, AlertTriangle, Wallet, Info, TrendingDown, TrendingUp, ArrowRightLeft, X as CloseIcon, Download } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, startOfMonth, parseISO, isValid as dateFnsIsValid } from 'date-fns';
@@ -33,13 +33,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { TransactionForm } from '@/components/transactions/transaction-form';
+import { TransactionForm } from '@/components/transactions/transaction-form'; // Import added
 import { BudgetForm } from '@/components/budgets/budget-form';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
 import { CategoryIcon } from '@/components/expenses/category-icon';
 import { cn } from '@/lib/utils';
 import { exportTransactionsToCSV } from '@/lib/csv-utils';
+import { TransactionFAB } from '@/components/shared/transaction-fab';
 
 
 export default function DashboardPage() {
@@ -56,8 +57,7 @@ export default function DashboardPage() {
     dataLoading,
     user,
     formatUserCurrency,
-    transactionToPrefillFromRecurring, 
-    setTransactionToPrefillFromRecurring, 
+    // transactionToPrefillFromRecurring and setTransactionToPrefillFromRecurring are used by TransactionFAB
   } = useAppData();
 
   const { toast } = useToast();
@@ -66,16 +66,14 @@ export default function DashboardPage() {
   const safeTransactions = Array.isArray(allTransactions) ? allTransactions : [];
   const sortedAccounts = [...accounts].sort((a,b) => a.name.localeCompare(b.name));
 
-  const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false);
-  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | undefined>(undefined);
+  // State for editing/deleting transactions (TransactionFAB handles new transactions)
+  const [transactionToEditForPage, setTransactionToEditForPage] = useState<Transaction | undefined>(undefined);
+  const [isEditTransactionFormOpen, setIsEditTransactionFormOpen] = useState(false);
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | undefined>(undefined);
 
   const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(false);
   const [budgetToEdit, setBudgetToEdit] = useState<Budget | undefined>(undefined);
   const [budgetToDeleteId, setBudgetToDeleteId] = useState<string | undefined>(undefined);
-
-  const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
-  const [transactionTypeForModal, setTransactionTypeForModal] = useState<TransactionType | undefined>(undefined);
 
   const currentMonthTransactions = safeTransactions.filter(t => getMonthYear(t.date) === currentMonthYYYYMM);
   const currentMonthExpenses = currentMonthTransactions.filter(t => t.type === 'expense');
@@ -127,21 +125,11 @@ export default function DashboardPage() {
   const userNamePart = user?.email?.split('@')[0] || 'Usuario';
   const capitalizedUserName = userNamePart.charAt(0).toUpperCase() + userNamePart.slice(1);
 
-
-  useEffect(() => {
-    console.log("DashboardPage: useEffect detected transactionToPrefillFromRecurring:", transactionToPrefillFromRecurring);
-    if (transactionToPrefillFromRecurring) {
-      setTransactionToEdit(undefined); 
-      setTransactionTypeForModal(transactionToPrefillFromRecurring.type); 
-      setIsTransactionFormOpen(true);
-    }
-  }, [transactionToPrefillFromRecurring]);
-
+  // useEffect for transactionToPrefillFromRecurring is now in TransactionFAB
 
   const handleEditTransaction = (transaction: Transaction) => {
-    setTransactionToEdit(transaction);
-    setTransactionTypeForModal(transaction.type);
-    setIsTransactionFormOpen(true);
+    setTransactionToEditForPage(transaction);
+    setIsEditTransactionFormOpen(true);
   };
   const handleDeleteTransactionConfirm = (id: string) => setTransactionToDeleteId(id);
   const executeDeleteTransaction = async () => {
@@ -151,23 +139,13 @@ export default function DashboardPage() {
       setTransactionToDeleteId(undefined);
     }
   };
-  const handleTransactionFormSave = () => {
-    setIsTransactionFormOpen(false);
-    setTransactionToEdit(undefined);
-    setTransactionTypeForModal(undefined);
-    if (transactionToPrefillFromRecurring) {
-      console.log("DashboardPage: Clearing prefill data on transaction form save.");
-      setTransactionToPrefillFromRecurring(null);
-    }
+  const handleEditTransactionFormSave = () => {
+    setIsEditTransactionFormOpen(false);
+    setTransactionToEditForPage(undefined);
   };
-   const handleTransactionDialogClose = () => {
-    setIsTransactionFormOpen(false);
-    setTransactionToEdit(undefined);
-    setTransactionTypeForModal(undefined);
-    if (transactionToPrefillFromRecurring) {
-      console.log("DashboardPage: Clearing prefill data on transaction dialog close.");
-      setTransactionToPrefillFromRecurring(null);
-    }
+   const handleEditTransactionDialogClose = () => {
+    setIsEditTransactionFormOpen(false);
+    setTransactionToEditForPage(undefined);
   };
 
   const handleEditBudget = (budget: Budget) => {
@@ -190,27 +168,6 @@ export default function DashboardPage() {
     setIsBudgetFormOpen(false);
     setBudgetToEdit(undefined);
   };
-
-  const transactionDialogTitleText = transactionToEdit ? "Editar Transacción" :
-                                   transactionTypeForModal === 'expense' ? "Añadir Nuevo Gasto" :
-                                   transactionTypeForModal === 'income' ? "Añadir Nuevo Ingreso" :
-                                   transactionTypeForModal === 'transfer' ? "Añadir Nueva Transferencia" : "Añadir Nueva Transacción";
-
-  const transactionDialogDescriptionText = transactionToEdit
-    ? "Actualiza los detalles de tu transacción."
-    : transactionTypeForModal === 'expense' ? "Introduce los detalles de tu nuevo gasto." :
-      transactionTypeForModal === 'income' ? "Introduce los detalles de tu nuevo ingreso." :
-      transactionTypeForModal === 'transfer' ? "Introduce los detalles de tu nueva transferencia." :
-      "Introduce los detalles de tu nueva transacción.";
-
-  const handleFabOptionClick = (type: TransactionType) => {
-    console.log("DashboardPage: FAB option clicked for type:", type);
-    setTransactionToEdit(undefined);
-    setTransactionTypeForModal(type);
-    setIsTransactionFormOpen(true);
-    setIsFabMenuOpen(false);
-  };
-
 
   if (dataLoading) {
     return (
@@ -249,47 +206,7 @@ export default function DashboardPage() {
         description={`${dynamicGreeting}, ${capitalizedUserName}! Aquí está tu resumen financiero para ${capitalizedMonthName}.`}
       />
 
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
-        {isFabMenuOpen && (
-          <div className="flex flex-col items-end gap-3 mb-2 transition-all duration-300 ease-in-out">
-            <Button
-              variant="secondary"
-              size="lg"
-              className="rounded-full shadow-lg w-auto pl-4 pr-5 py-3 h-auto bg-background hover:bg-muted text-foreground"
-              onClick={() => handleFabOptionClick('transfer')}
-            >
-              <ArrowRightLeft className="mr-2 h-5 w-5 text-blue-500" />
-              Transferencia
-            </Button>
-            <Button
-              variant="secondary"
-              size="lg"
-              className="rounded-full shadow-lg w-auto pl-4 pr-5 py-3 h-auto bg-background hover:bg-muted text-foreground"
-              onClick={() => handleFabOptionClick('income')}
-            >
-              <TrendingUp className="mr-2 h-5 w-5 text-green-500" />
-              Ingreso
-            </Button>
-            <Button
-              variant="secondary"
-              size="lg"
-              className="rounded-full shadow-lg w-auto pl-4 pr-5 py-3 h-auto bg-background hover:bg-muted text-foreground"
-              onClick={() => handleFabOptionClick('expense')}
-            >
-              <TrendingDown className="mr-2 h-5 w-5 text-red-500" />
-              Gasto
-            </Button>
-          </div>
-        )}
-        <Button
-          size="icon"
-          className="rounded-full h-14 w-14 shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground"
-          onClick={() => setIsFabMenuOpen(!isFabMenuOpen)}
-          aria-label={isFabMenuOpen ? "Cerrar menú de acciones" : "Abrir menú de acciones"}
-        >
-          {isFabMenuOpen ? <CloseIcon className="h-7 w-7" /> : <Plus className="h-7 w-7" />}
-        </Button>
-      </div>
+      <TransactionFAB />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
@@ -381,22 +298,21 @@ export default function DashboardPage() {
         />
       </div>
 
-      <Dialog open={isTransactionFormOpen} onOpenChange={(open) => {
-          if (!open) handleTransactionDialogClose();
-          else setIsTransactionFormOpen(true);
+      {/* Edit Transaction Dialog (New transactions handled by TransactionFAB) */}
+      <Dialog open={isEditTransactionFormOpen} onOpenChange={(open) => {
+          if (!open) handleEditTransactionDialogClose();
+          else setIsEditTransactionFormOpen(true);
         }}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col" aria-label={transactionDialogTitleText}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col" aria-label="Editar Transacción">
           <DialogHeader>
-            <DialogTitle>{transactionDialogTitleText}</DialogTitle>
-            <DialogDescription>{transactionDialogDescriptionText}</DialogDescription>
+            <DialogTitle>Editar Transacción</DialogTitle>
+            <DialogDescription>Actualiza los detalles de tu transacción.</DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-grow overflow-y-auto pr-6 -mr-6">
             <TransactionForm
-              transactionToEdit={transactionToEdit}
-              initialType={transactionTypeForModal}
-              transactionToPrefill={transactionToPrefillFromRecurring || undefined} 
-              onSave={handleTransactionFormSave}
-              dialogClose={handleTransactionDialogClose}
+              transactionToEdit={transactionToEditForPage}
+              onSave={handleEditTransactionFormSave}
+              dialogClose={handleEditTransactionDialogClose}
             />
           </ScrollArea>
         </DialogContent>
@@ -448,4 +364,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

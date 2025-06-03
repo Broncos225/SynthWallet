@@ -22,93 +22,101 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { ExpenseForm } from '@/components/expenses/expense-form';
+import { ExpenseForm } from '@/components/expenses/expense-form'; //This will be used for editing existing expenses
+import { TransactionForm } from '@/components/transactions/transaction-form'; // For editing existing transactions
 import { ExpenseTable } from '@/components/expenses/expense-table';
 import { PageHeader } from '@/components/shared/page-header';
 import { useAppData } from '@/contexts/app-data-context';
-import type { Expense } from '@/types';
+import type { Expense, Transaction } from '@/types'; // Expense might be deprecated for Transaction
 import { useToast } from "@/hooks/use-toast";
+import { TransactionFAB } from '@/components/shared/transaction-fab';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function ExpensesPage() {
-  const { expenses, deleteExpense, dataLoading } = useAppData();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [expenseToEdit, setExpenseToEdit] = useState<Expense | undefined>(undefined);
-  const [expenseToDeleteId, setExpenseToDeleteId] = useState<string | undefined>(undefined);
+  const { transactions, deleteTransaction, dataLoading } = useAppData(); // Using 'transactions' which is the new 'expenses'
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | undefined>(undefined);
+  const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
   
-  const dialogTitleText = expenseToEdit ? "Editar Gasto" : "Añadir Nuevo Gasto";
-  const dialogDescriptionText = expenseToEdit 
-    ? "Actualiza los detalles de tu gasto."
-    : "Introduce los detalles de tu nuevo gasto.";
+  const dialogTitleText = "Editar Gasto"; // FAB handles new
+  const dialogDescriptionText = "Actualiza los detalles de tu gasto.";
 
-  const handleEdit = (expense: Expense) => {
-    setExpenseToEdit(expense);
-    setIsFormOpen(true);
+  const handleEdit = (transaction: Transaction) => {
+    if (transaction.type !== 'expense') {
+      toast({ variant: "destructive", title: "Acción no permitida", description: "Solo se pueden editar gastos desde esta sección."});
+      return;
+    }
+    setTransactionToEdit(transaction);
+    setIsEditFormOpen(true);
   };
 
-  const handleDeleteConfirm = (expenseId: string) => {
-    setExpenseToDeleteId(expenseId);
+  const handleDeleteConfirm = (transactionId: string) => {
+    setTransactionToDeleteId(transactionId);
   };
 
   const executeDelete = async () => {
-    if (expenseToDeleteId) {
-      await deleteExpense(expenseToDeleteId);
+    if (transactionToDeleteId) {
+      await deleteTransaction(transactionToDeleteId);
       toast({ title: "Gasto Eliminado", description: "El gasto ha sido eliminado exitosamente."});
-      setExpenseToDeleteId(undefined);
+      setTransactionToDeleteId(undefined);
     }
   };
 
   const handleFormSave = () => {
-    setIsFormOpen(false);
-    setExpenseToEdit(undefined); 
+    setIsEditFormOpen(false);
+    setTransactionToEdit(undefined); 
   };
   
   const handleDialogClose = () => {
-    setIsFormOpen(false);
-    setExpenseToEdit(undefined); 
+    setIsEditFormOpen(false);
+    setTransactionToEdit(undefined); 
   };
 
+  const expenseTransactions = transactions.filter(t => t.type === 'expense');
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Gastos"
         description="Registra y gestiona tus gastos."
-        actions={
-          <Dialog open={isFormOpen} onOpenChange={(open) => {
-            if (!open) handleDialogClose();
-            else setIsFormOpen(true);
-          }}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { setExpenseToEdit(undefined); setIsFormOpen(true); }}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Gasto
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md" aria-label={dialogTitleText}>
-              <DialogHeader>
-                <DialogTitle>{dialogTitleText}</DialogTitle>
-                <DialogDescription>
-                  {dialogDescriptionText}
-                </DialogDescription>
-              </DialogHeader>
-              <ExpenseForm 
-                expenseToEdit={expenseToEdit} 
-                onSave={handleFormSave} 
-                dialogClose={handleDialogClose} 
-              />
-            </DialogContent>
-          </Dialog>
-        }
+        // Actions are now handled by the FAB for adding new ones.
+        // The header button for "Añadir Gasto" can be removed if FAB is preferred.
       />
       
       <ExpenseTable 
-        expenses={expenses} 
+        expenses={expenseTransactions} // Pass only expense type transactions
         onEdit={handleEdit}
         onDelete={handleDeleteConfirm}
         isLoading={dataLoading}
       />
 
-      <AlertDialog open={!!expenseToDeleteId} onOpenChange={() => setExpenseToDeleteId(undefined)}>
+      <TransactionFAB />
+
+      {/* Dialog for Editing Expenses */}
+      <Dialog open={isEditFormOpen} onOpenChange={(open) => {
+        if (!open) handleDialogClose();
+        else setIsEditFormOpen(true);
+      }}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col" aria-label={dialogTitleText}>
+          <DialogHeader>
+            <DialogTitle>{dialogTitleText}</DialogTitle>
+            <DialogDescription>
+              {dialogDescriptionText}
+            </DialogDescription>
+          </DialogHeader>
+           <ScrollArea className="flex-grow overflow-y-auto pr-6 -mr-6">
+            <TransactionForm 
+              transactionToEdit={transactionToEdit} 
+              onSave={handleFormSave} 
+              dialogClose={handleDialogClose} 
+            />
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+
+      <AlertDialog open={!!transactionToDeleteId} onOpenChange={() => setTransactionToDeleteId(undefined)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
@@ -117,7 +125,7 @@ export default function ExpensesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setExpenseToDeleteId(undefined)}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setTransactionToDeleteId(undefined)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={executeDelete} className="bg-destructive hover:bg-destructive/90">
               Eliminar
             </AlertDialogAction>

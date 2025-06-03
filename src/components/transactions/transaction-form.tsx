@@ -118,6 +118,7 @@ const createDefaultFormValues = (
   const category = transaction?.categoryId && getCategoryByIdFn ? getCategoryByIdFn(transaction.categoryId) : undefined;
   // @ts-ignore
   const dateToSet = transaction?.date ? (isValid(parseISO(transaction.date as string)) ? parseISO(transaction.date as string) : new Date()) : new Date();
+  const defaultParentCatId = type === 'income' ? 'income' : (type === 'expense' ? DEFAULT_CATEGORY_ID : "");
 
   return {
     type: transaction?.type || type,
@@ -127,7 +128,7 @@ const createDefaultFormValues = (
     accountId: transaction?.type !== 'transfer' ? (transaction?.accountId || DEFAULT_ACCOUNT_ID) : "",
     fromAccountId: transaction?.type === 'transfer' ? (transaction?.fromAccountId || "") : "",
     toAccountId: transaction?.type === 'transfer' ? (transaction?.toAccountId || "") : "",
-    parentCategoryId: category ? (category.parentId || category.id) : (transaction?.type === 'transfer' ? "" : (transaction?.type === 'income' ? 'income' : DEFAULT_CATEGORY_ID)),
+    parentCategoryId: category ? (category.parentId || category.id) : defaultParentCatId,
     subCategoryId: category?.parentId ? category.id : "",
     payee: transaction?.payee || "",
     templateId: NONE_TEMPLATE_VALUE,
@@ -149,14 +150,14 @@ export function TransactionForm({
     addTransaction,
     updateTransaction,
     getCategoryById,
-    getExpenseTemplates, // Kept name for now, as it refers to templates primarily for expenses/incomes
+    getExpenseTemplates,
     accounts,
     savingGoals: allSavingGoals,
-    formatUserCurrency, // No longer used directly here for formatting inputs
+    formatUserCurrency,
   } = useAppData();
   const { toast } = useToast();
 
-  const parentCategories = getParentCategories();
+  const allParentCategoriesFromContext = getParentCategories();
   const [currentSubcategories, setCurrentSubcategories] = useState<Category[]>([]);
   const transactionTemplates = getExpenseTemplates();
   const activeSavingGoals = allSavingGoals.filter(g => g.status === 'active' || g.id === transactionToEdit?.savingGoalId);
@@ -172,19 +173,13 @@ export function TransactionForm({
   const selectedTemplateId = form.watch("templateId");
   const transactionType = form.watch("type");
 
-  console.log("TransactionForm: Initial render/props. transactionToPrefill:", transactionToPrefill, "transactionToEdit:", transactionToEdit, "initialType:", initialType);
-
   useEffect(() => {
-    console.log("TransactionForm: Prefill/Edit useEffect. transactionToPrefill:", transactionToPrefill, "transactionToEdit:", transactionToEdit, "initialType:", initialType);
     if (transactionToEdit) {
-      console.log("TransactionForm useEffect: Mode: Editing existing transaction", transactionToEdit.id);
       form.reset(createDefaultFormValues(transactionToEdit.type, transactionToEdit, getCategoryById));
     } else if (transactionToPrefill) {
-      console.log("TransactionForm useEffect: Mode: Applying prefill data", transactionToPrefill);
       form.reset(createDefaultFormValues(transactionToPrefill.type || initialType, transactionToPrefill, getCategoryById));
     } else {
-      console.log("TransactionForm useEffect: Mode: New transaction, initialType:", initialType);
-      form.reset(createDefaultFormValues(initialType));
+      form.reset(createDefaultFormValues(initialType || 'expense', undefined, getCategoryById));
     }
   }, [transactionToEdit, transactionToPrefill, initialType, form, getCategoryById]);
 
@@ -205,7 +200,7 @@ export function TransactionForm({
           form.setValue("subCategoryId", "");
         }
         form.setValue("accountId", template.accountId || DEFAULT_ACCOUNT_ID);
-        form.setValue("type", "expense"); // Templates are assumed to be expenses for now
+        form.setValue("type", "expense"); 
         form.setValue("savingGoalId", NONE_SAVING_GOAL_VALUE);
       }
     }
@@ -213,41 +208,64 @@ export function TransactionForm({
 
 
   useEffect(() => {
-    if (selectedParentCategoryId) {
+    const currentType = form.getValues("type");
+    let parentIdToSet = form.getValues("parentCategoryId");
+    let subs: Category[] = [];
+
+    if (currentType === 'transfer') {
+      parentIdToSet = ""; 
+      form.setValue('payee', '');
+      form.setValue('accountId', ""); 
+      if (!form.getValues('fromAccountId') && accounts.length > 0) form.setValue('fromAccountId', accounts[0]?.id || "");
+      if (!form.getValues('toAccountId') && accounts.length > 1) form.setValue('toAccountId', accounts[1]?.id || accounts[0]?.id || "");
+      else if (!form.getValues('toAccountId') && accounts.length === 1) form.setValue('toAccountId', accounts[0]?.id || "");
+    } else if (currentType === 'income') {
+      parentIdToSet = "income";
+      subs = getSubcategories("income");
+      if (!form.getValues('accountId')) form.setValue('accountId', DEFAULT_ACCOUNT_ID);
+      form.setValue('fromAccountId', "");
+      form.setValue('toAccountId', "");
+    } else if (currentType === 'expense') {
+      if (!parentIdToSet || parentIdToSet === "income") {
+        parentIdToSet = DEFAULT_CATEGORY_ID;
+      }
+      subs = getSubcategories(parentIdToSet);
+      if (!form.getValues('accountId')) form.setValue('accountId', DEFAULT_ACCOUNT_ID);
+      form.setValue('fromAccountId', "");
+      form.setValue('toAccountId', "");
+    }
+    
+    form.setValue('parentCategoryId', parentIdToSet);
+    setCurrentSubcategories(subs);
+    const currentSubId = form.getValues("subCategoryId");
+    if (currentSubId && !subs.find(s => s.id === currentSubId)) {
+       form.setValue("subCategoryId", "");
+    }
+
+  }, [transactionType, form, accounts, getSubcategories, DEFAULT_ACCOUNT_ID, DEFAULT_CATEGORY_ID]);
+
+
+  useEffect(() => {
+    // This effect updates subcategories when parentCategoryId changes
+    if (selectedParentCategoryId && selectedParentCategoryId !== "income") {
       const subs = getSubcategories(selectedParentCategoryId);
       setCurrentSubcategories(subs);
       const currentSubId = form.getValues("subCategoryId");
       if (currentSubId && !subs.find(s => s.id === currentSubId)) {
-         form.setValue("subCategoryId", ""); // Reset to empty string for controlled component
+         form.setValue("subCategoryId", ""); 
+      }
+    } else if (selectedParentCategoryId === "income") {
+      const subs = getSubcategories("income");
+      setCurrentSubcategories(subs);
+       const currentSubId = form.getValues("subCategoryId");
+      if (currentSubId && !subs.find(s => s.id === currentSubId)) {
+         form.setValue("subCategoryId", ""); 
       }
     } else {
       setCurrentSubcategories([]);
-      form.setValue("subCategoryId", ""); // Reset to empty string
+      form.setValue("subCategoryId", "");
     }
   }, [selectedParentCategoryId, getSubcategories, form]);
-
-
-  useEffect(() => {
-    const currentType = form.getValues("type");
-    if (currentType === 'transfer') {
-      form.setValue('parentCategoryId', "");
-      form.setValue('subCategoryId', "");
-      form.setValue('payee', '');
-      form.setValue('accountId', "");
-      if (!form.getValues('fromAccountId') && accounts.length > 0) form.setValue('fromAccountId', accounts[0]?.id || "");
-      if (!form.getValues('toAccountId') && accounts.length > 1) form.setValue('toAccountId', accounts[1]?.id || accounts[0]?.id || "");
-      else if (!form.getValues('toAccountId') && accounts.length === 1) form.setValue('toAccountId', accounts[0]?.id || "");
-    } else if (currentType === 'expense' || currentType === 'income') {
-      if (!form.getValues('parentCategoryId')) {
-          form.setValue('parentCategoryId', currentType === 'income' ? 'income' : DEFAULT_CATEGORY_ID);
-      }
-      form.setValue('fromAccountId', "");
-      form.setValue('toAccountId', "");
-      if (!form.getValues('accountId')) {
-        form.setValue('accountId', DEFAULT_ACCOUNT_ID);
-      }
-    }
-  }, [transactionType, form, accounts, DEFAULT_ACCOUNT_ID, DEFAULT_CATEGORY_ID]);
 
 
   async function onSubmit(data: TransactionFormValues) {
@@ -273,8 +291,8 @@ export function TransactionForm({
 
     const transactionPayload: Omit<Transaction, 'id' | 'date' | 'relatedDebtTransactionId'> & {date: Date} = {
       description: data.description,
-      amount: data.amount, // RHF ensures this is a number
-      date: data.date, // RHF ensures this is a Date object
+      amount: data.amount, 
+      date: data.date, 
       categoryId: finalCategoryId,
       payee: data.payee || null,
       accountId: data.type === 'transfer' ? (data.fromAccountId!) : (data.accountId!),
@@ -573,31 +591,41 @@ export function TransactionForm({
                     <Select
                       onValueChange={(value) => {
                           field.onChange(value);
-                          form.setValue("subCategoryId", ""); // Reset subcategory
                       }}
                       value={field.value || ""}
                       disabled={isFieldDisabled || transactionType === 'income'}
                     >
                     <FormControl>
                         <SelectTrigger>
-                        <SelectValue placeholder="Selecciona categoría principal" />
+                          <SelectValue placeholder="Selecciona categoría principal" />
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                        {parentCategories
-                          .filter(c => transactionType === 'income' ? c.id === 'income' : c.id !== 'income')
+                      {transactionType === 'income' ? (
+                        (() => {
+                          const incomeCategory = allParentCategoriesFromContext.find(c => c.id === 'income');
+                          return incomeCategory ? (
+                            <SelectItem key={incomeCategory.id} value={incomeCategory.id}>
+                              {incomeCategory.name}
+                            </SelectItem>
+                          ) : <SelectItem value="" disabled>Cargando...</SelectItem>;
+                        })()
+                      ) : (
+                        allParentCategoriesFromContext
+                          .filter(c => c.id !== 'income')
                           .map((category) => (
                             <SelectItem key={category.id} value={category.id}>
                                 {category.name}
                             </SelectItem>
-                          ))}
+                          ))
+                      )}
                     </SelectContent>
                     </Select>
                     <FormMessage />
                 </FormItem>
                 )}
             />
-            {(currentSubcategories.length > 0 || (transactionToEdit && getCategoryById(transactionToEdit.categoryId || "")?.parentId)) && transactionType === 'expense' && (
+            {(currentSubcategories.length > 0 || (transactionToEdit && getCategoryById(transactionToEdit.categoryId || "")?.parentId)) && (
                 <FormField
                 control={form.control}
                 name="subCategoryId"

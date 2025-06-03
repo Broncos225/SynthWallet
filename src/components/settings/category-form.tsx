@@ -56,9 +56,12 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
   const { toast } = useToast();
 
   const parentCategoryOptions = getAllParentCategories().filter(pc => {
+    // La categoría no puede ser su propio padre.
     if (categoryToEdit && categoryToEdit.id === pc.id) return false;
+    // 'uncategorized' y 'other' no pueden ser padres de otras categorías.
+    if (pc.id === 'uncategorized' || pc.id === 'other') return false;
     return true;
-  }).filter(c => !RESERVED_CATEGORY_IDS.includes(c.id) || c.id === categoryToEdit?.parentId);
+  });
 
 
   const form = useForm<CategoryFormValues>({
@@ -78,7 +81,7 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
         },
   });
   
-  const isReserved = categoryToEdit && RESERVED_CATEGORY_IDS.includes(categoryToEdit.id);
+  const isReservedForParenting = categoryToEdit && (RESERVED_CATEGORY_IDS.includes(categoryToEdit.id) && categoryToEdit.id !== 'income');
   const watchedColor = form.watch("color");
   const watchedIcon = form.watch("icon");
 
@@ -103,8 +106,8 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
   async function onSubmit(data: CategoryFormValues) {
     const finalParentId = data.parentId === NO_PARENT_VALUE ? undefined : data.parentId;
     
-    if (isReserved && finalParentId) {
-        toast({ variant: "destructive", title: "Acción no permitida", description: "Las categorías reservadas no pueden ser subcategorías."});
+    if (categoryToEdit && RESERVED_CATEGORY_IDS.includes(categoryToEdit.id) && categoryToEdit.id !== 'income' && finalParentId) {
+        toast({ variant: "destructive", title: "Acción no permitida", description: `La categoría reservada "${categoryToEdit.name}" no puede ser una subcategoría.`});
         form.setValue("parentId", NO_PARENT_VALUE); 
         return;
     }
@@ -117,19 +120,20 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
       name: data.name,
       parentId: finalParentId,
       icon: data.icon,
-      color: data.color || null, // Changed undefined to null
+      color: data.color || null,
     };
 
     if (categoryToEdit) {
-      if (isReserved) {
+      if (RESERVED_CATEGORY_IDS.includes(categoryToEdit.id) && categoryToEdit.id !== 'income') {
+        // Si es una categoría reservada (excepto income), no se permite cambiar parentId
         const reservedSafeData = {
             name: data.name,
             icon: data.icon,
-            color: data.color || null, // Changed undefined to null
-            parentId: categoryToEdit.parentId,
+            color: data.color || null,
+            parentId: categoryToEdit.parentId, // Mantiene el parentId original
         }
         await updateCategory({ ...reservedSafeData, id: categoryToEdit.id });
-        toast({ title: "Categoría Reservada Actualizada", description: `"${data.name}" ha sido actualizada.` });
+        toast({ title: `Categoría "${categoryToEdit.name}" Actualizada`, description: `Sus detalles (excepto ser subcategoría) han sido actualizados.` });
       } else {
         await updateCategory({ ...categoryData, id: categoryToEdit.id });
         toast({ title: "Categoría Actualizada", description: `"${data.name}" ha sido actualizada.` });
@@ -160,14 +164,20 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
           )}
         />
 
-        {!isReserved && (
+        {/* Permitir seleccionar padre a menos que estés editando 'uncategorized' o 'other' */}
+        {!(categoryToEdit && (categoryToEdit.id === 'uncategorized' || categoryToEdit.id === 'other')) && (
           <FormField
             control={form.control}
             name="parentId"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Categoría Principal (Opcional)</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                <Select 
+                  onValueChange={field.onChange} 
+                  value={field.value} 
+                  defaultValue={field.value}
+                  disabled={isReservedForParenting}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona categoría principal si es subcategoría" />
@@ -182,6 +192,7 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
                     ))}
                   </SelectContent>
                 </Select>
+                {isReservedForParenting && <FormMessage>Las categorías reservadas (excepto Ingresos) no pueden ser subcategorías.</FormMessage>}
                 <FormMessage />
               </FormItem>
             )}

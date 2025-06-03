@@ -32,9 +32,10 @@ import { format, parse as parseDateFns } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
+import { TransactionFAB } from '@/components/shared/transaction-fab';
 
 export default function BudgetsPage() {
-  const { budgets, expenses, deleteBudget, getCategoryName, dataLoading } = useAppData();
+  const { transactions, budgets, deleteBudget, getCategoryName, dataLoading } = useAppData(); // expenses renamed to transactions
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [budgetToEdit, setBudgetToEdit] = useState<Budget | undefined>(undefined);
   const [budgetToDeleteId, setBudgetToDeleteId] = useState<string | undefined>(undefined);
@@ -137,7 +138,7 @@ export default function BudgetsPage() {
             <BudgetListItem 
               key={budget.id} 
               budget={budget} 
-              expenses={expenses}
+              transactions={transactions.filter(t => t.type === 'expense')} // Pass only expenses to budget list item
               onEdit={handleEdit}
               onDelete={handleDeleteConfirm}
             />
@@ -152,6 +153,8 @@ export default function BudgetsPage() {
           </CardContent>
         </Card>
       )}
+
+      <TransactionFAB />
 
       <AlertDialog open={!!budgetToDeleteId} onOpenChange={() => setBudgetToDeleteId(undefined)}>
         <AlertDialogContent>
