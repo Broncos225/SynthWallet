@@ -1,7 +1,7 @@
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getDatabase } from 'firebase/database';
+import { getDatabase } from 'firebase/database'; // Removed enablePersistence
 
 const firebaseConfig = {
   apiKey: "AIzaSyChWq-3GHenAik2YNoptMXrlJbRFHzp3CA",
@@ -23,5 +23,8 @@ if (!getApps().length) {
 
 const auth = getAuth(app);
 const db = getDatabase(app);
+
+// Attempt to enable persistence was removed due to import issues.
+// console.log("Firebase Realtime Database initialized. Offline persistence was attempted but removed.");
 
 export { app, auth, db };

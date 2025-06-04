@@ -29,7 +29,8 @@ import { AppDataProvider, useAppData } from '@/contexts/app-data-context';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LogOut } from 'lucide-react';
+import { LogOut, Wifi, WifiOff } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import type { ThemeSettings } from '@/types';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -59,9 +60,28 @@ function ShellLayout({ children }: { children: ReactNode }) {
     "flex min-h-screen w-full items-center justify-center bg-background"
   );
   const [dynamicGreeting, setDynamicGreeting] = useState("Bienvenido");
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   useEffect(() => {
     setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Set initial state based on current status
+    setIsOnline(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   useEffect(() => {
@@ -180,8 +200,19 @@ function ShellLayout({ children }: { children: ReactNode }) {
           <div className="hidden md:block">
             {user && <span className="text-lg font-semibold text-foreground">{dynamicGreeting}, {capitalizedUserName}!</span>}
           </div>
-          <div>
-            {/* User Menu or Actions */}
+          <div className="flex items-center gap-2">
+            {isOnline ? (
+              <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white">
+                <Wifi className="mr-1 h-3.5 w-3.5" />
+                Online
+              </Badge>
+            ) : (
+              <Badge variant="destructive">
+                <WifiOff className="mr-1 h-3.5 w-3.5" />
+                Offline
+              </Badge>
+            )}
+            {/* User Menu or Other Actions can go here */}
           </div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-6">
