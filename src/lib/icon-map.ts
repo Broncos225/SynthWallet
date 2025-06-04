@@ -2,10 +2,10 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Utensils, Car, Gamepad2, Home, Zap, ShoppingBag, Stethoscope, BookOpen, Plane, Shapes, Palette, Briefcase,
-  Pizza, Coffee, Bus, Shirt, Pill, University, Landmark, Settings, Trash2, Edit3, PlusCircle, ChevronDown, X, Star,
-  FileText, Archive, Tags, PencilLine, ListChecks, AlertTriangle, DollarSign, CreditCard, Target, BarChartHorizontalBig,
+  Pizza, Coffee, Bus, Shirt, Pill, University, Landmark as LandmarkIcon, Settings, Trash2, Edit3, PlusCircle, ChevronDown, X, Star,
+  FileText, Archive, Tags, PencilLine, ListChecks, AlertTriangle, DollarSign, CreditCard, Target as TargetIcon, BarChartHorizontalBig,
   PiggyBank, Wallet, TrendingUp, Users, Activity, Anchor, Apple, Award, Axe, Baby, Backpack, Banana, Banknote,
-  Bath, Beer, Bell, Bike, Binary, Bitcoin, Blinds, Bone, Book, Bookmark, Bot, Box, Brain, BrickWall,
+  Bath, Beer, Bell, Bike, Binary, Bitcoin, Blinds, Bone, Book as BookIcon, Bookmark, Bot, Box, Brain, BrickWall,
   Building, BusFront, Cable, Cake, Calculator, CalendarDays, Camera, CandlestickChart, Candy, CheckCircle,
   ChevronLeft, ChevronRight, CircleDollarSign, CircuitBoard, Citrus, Clapperboard, Clipboard, Clock, Cloud,
   Code, Cog, Coins, Columns, Combine, Command, Compass, Component, Computer, Construction, Contact,
@@ -26,17 +26,17 @@ import {
   HandCoins, HandHeart, HandHelping, HandMetal, HandPlatter, Handshake, HardDrive, HardHat, Hash, Haze,
   Heading, Heart, HelpCircle, Hexagon, Highlighter, History, Hotel, Hourglass, Image, Images, Import,
   Inbox, Indent, IndianRupee, Info, Inspect, Instagram, Italic, IterationCcw, IterationCw, JapaneseYen,
-  Joystick, Kanban, Key, Keyboard, Lamp, LandmarkIcon, Languages, Laptop, Lasso, Laugh, Layers, LayoutDashboard,
+  Joystick, Kanban, Key, Keyboard, Lamp, Languages, Laptop, Lasso, Laugh, Layers, LayoutDashboard,
   LayoutGrid, LayoutList, LayoutTemplate, Leaf, Library, LifeBuoy, Lightbulb, Link, Linkedin, List,
   ListFilter, ListMinus, ListOrdered, ListPlus, ListRestart, ListTodo, ListVideo, ListX, Loader, Locate,
   Lock, LogIn, LogOut, Lollipop, Luggage, Magnet, Mail, Mailbox, Mails, Map, MapPin, Martini, Maximize,
   Medal, Megaphone, Menu, MessageCircle, MessageSquare, Mic, Microscope, Microwave, Milestone, Milk,
   Minus, Monitor, Moon, MoreHorizontal, Mountain, Mouse, MousePointer, Move, Music, Navigation, Network,
   Newspaper, Nut, Octagon, Option, Orbit, Package, PaintBucket, Paintbrush, Palmtree, PanelBottom,
-  PanelLeftIcon, PanelRight, PanelTop, Paperclip, Parentheses, ParkingCircle, PartyPopper, Pause, PcCase, Pen,
+  PanelLeft as PanelLeftIcon, PanelRight, PanelTop, Paperclip, Parentheses, ParkingCircle, PartyPopper, Pause, PcCase, Pen,
   PenTool, Percent, PersonStanding, Phone, PictureInPicture, Pilcrow, Pin, Pipette, PlaneLanding, PlaneTakeoff,
   Play, Plug, Pocket, Podcast, Pointer, PoundSterling, Power, Printer, Projector, Puzzle, QrCode, Quote,
-  Rabbit, Radar, Radiation, Radio, RadioReceiver, RadioTower, Rat, Ratio, RatioIcon, Receipt, RectangleHorizontal,
+  Rabbit, Radar, Radiation, Radio, RadioReceiver, RadioTower, Rat, Ratio as RatioIcon, Receipt, RectangleHorizontal,
   RectangleVertical, Recycle, Redo, RefreshCcw, RefreshCw, Refrigerator, Regex, RemoveFormatting, Repeat,
   Reply, ReplyAll, Replace, Rewind, Rocket, RockingChair, RotateCcw, RotateCw, Route, Router, Rows, Rss,
   Ruler, RussianRuble, Sailboat, Save, Scale, Scan, School, Scissors, ScreenShare, Scroll, Search, Send,
@@ -45,9 +45,9 @@ import {
   Sliders, Smartphone, Smile, Snowflake, Sofa, SortAsc, SortDesc, Sprout, Square, Stamp, StepBack,
   StepForward, Sticker, StickyNote, Store, StretchHorizontal, StretchVertical, Strikethrough, Subscript,
   Subtitles, Sun, Sunrise, Sunset, SwissFranc, SwitchCamera, Sword, Swords, Syringe, Table, Tablet, Tag,
-  TargetIcon, Tent, Terminal, TestTube, TestTubes, Text, TextCursor, TextQuote, TextSelect, Thermometer, ThumbsDown,
+  Tent, Terminal, TestTube, TestTubes, Text, TextCursor, TextQuote, TextSelect, Thermometer, ThumbsDown,
   ThumbsUp, Ticket, Timer, ToggleLeft, ToggleRight, Tornado, Touchpad, TowerControl, ToyBrick, Tractor,
-  Train, Trash, TreeDeciduous, TreePine, Trees, Trello, TrendingDown, Triangle, Trophy, Truck, Tv, Twitch,
+  Train, TreeDeciduous, TreePine, Trees, Trello, TrendingDown, Triangle, Trophy, Truck, Tv, Twitch,
   Twitter, Type, Underline, Undo, UnfoldHorizontal, UnfoldVertical, Unlink, Unlock, Unplug, Upload, Usb,
   User, UserCheck, UserCog, UserMinus, UserPlus, UserX, VenetianMask, Verified, Vibrate, Video, View,
   Voicemail, Volume, Volume1, Volume2, VolumeX, Vote, Wand, Warehouse, Waypoints, Webcam, Webhook,
@@ -59,7 +59,7 @@ export const iconMap: { [key: string]: LucideIcon } = {
   Pizza, Coffee, Bus, Shirt, Pill, University, Landmark: LandmarkIcon, Settings, Trash2, Edit3, PlusCircle, ChevronDown, X, Star,
   FileText, Archive, Tags, PencilLine, ListChecks, AlertTriangle, DollarSign, CreditCard, Target: TargetIcon, BarChartHorizontalBig,
   PiggyBank, Wallet, TrendingUp, Users, Activity, Anchor, Apple, Award, Axe, Baby, Backpack, Banana, Banknote,
-  Bath, Beer, Bell, Bike, Binary, Bitcoin, Blinds, Bone, BookIcon: Book, Bookmark, Bot, Box, Brain, BrickWall,
+  Bath, Beer, Bell, Bike, Binary, Bitcoin, Blinds, Bone, BookIcon: BookIcon, Bookmark, Bot, Box, Brain, BrickWall,
   Building, BusFront, Cable, Cake, Calculator, CalendarDays, Camera, CandlestickChart, Candy, CheckCircle,
   ChevronLeft, ChevronRight, CircleDollarSign, CircuitBoard, Citrus, Clapperboard, Clipboard, Clock, Cloud,
   Code, Cog, Coins, Columns, Combine, Command, Compass, Component, Computer, Construction, Contact,
@@ -101,7 +101,7 @@ export const iconMap: { [key: string]: LucideIcon } = {
   Subtitles, Sun, Sunrise, Sunset, SwissFranc, SwitchCamera, Sword, Swords, Syringe, Table, Tablet, Tag,
   TargetIcon, Tent, Terminal, TestTube, TestTubes, Text, TextCursor, TextQuote, TextSelect, Thermometer, ThumbsDown,
   ThumbsUp, Ticket, Timer, ToggleLeft, ToggleRight, Tornado, Touchpad, TowerControl, ToyBrick, Tractor,
-  Train, Trash, TreeDeciduous, TreePine, Trees, Trello, TrendingDown, Triangle, Trophy, Truck, Tv, Twitch,
+  Train, TreeDeciduous, TreePine, Trees, Trello, TrendingDown, Triangle, Trophy, Truck, Tv, Twitch,
   Twitter, Type, Underline, Undo, UnfoldHorizontal, UnfoldVertical, Unlink, Unlock, Unplug, Upload, Usb,
   User, UserCheck, UserCog, UserMinus, UserPlus, UserX, VenetianMask, Verified, Vibrate, Video, View,
   Voicemail, Volume, Volume1, Volume2, VolumeX, Vote, Wand, Warehouse, Waypoints, Webcam, Webhook,
@@ -113,8 +113,52 @@ export type AvailableIconItem = {
   component: LucideIcon;
 };
 
-export const availableIcons: AvailableIconItem[] = Object.entries(iconMap)
+export const allAvailableIcons: AvailableIconItem[] = Object.entries(iconMap)
   .map(([name, component]) => ({ name, component }))
   .sort((a, b) => a.name.localeCompare(b.name));
+
+// Curated list of icons for finance and general categories
+const financeAndGeneralIconNames: string[] = [
+  'Utensils', 'Car', 'Gamepad2', 'Home', 'Zap', 'ShoppingBag', 'Stethoscope', 'BookOpen', 'Plane', 'Shapes', 'Palette', 'Briefcase',
+  'Pizza', 'Coffee', 'Bus', 'Shirt', 'Pill', 'University', 'Landmark', 'Settings', 'Trash2', 'Edit3', 'PlusCircle', 'DollarSign', 'CreditCard', 'Target', 'BarChartHorizontalBig',
+  'PiggyBank', 'Wallet', 'TrendingUp', 'TrendingDown', 'Users', 'Activity', 'Apple', 'Award', 'Baby', 'Backpack', 'Banana', 'Banknote',
+  'Bath', 'Beer', 'Bell', 'Bike', 'Bone', 'BookIcon', 'Bookmark', 'Box', 'Brain', 'Building', 'BusFront', 'Cake', 'Calculator', 'CalendarDays', 'Camera', 'CandlestickChart', 'Candy', 'CheckCircle',
+  'CircleDollarSign', 'Citrus', 'Clipboard', 'Clock', 'Cloud', 'Cog', 'Coins', 'Compass', 'Component', 'Computer', 'Construction', 'Contact',
+  'Container', 'Cookie', 'Copyright', 'Crown', 'CupSoda', 'Diamond',
+  'Dice5', 'Disc', 'Drama', 'Drill', 'Dumbbell', 'Ear', 'ExternalLink',
+  'Eye', 'Factory', 'Fan', 'Feather', 'FerrisWheel', 'FileTextIcon', 'Film',
+  'Filter', 'Fingerprint', 'Flag', 'Flame', 'Flashlight', 'Flower', 'Folder',
+  'Footprints', 'Forklift', 'Frame', 'Fuel', 'FunctionSquare', 'GalleryHorizontal', 'Gauge, Gavel', 'Gem', 'Ghost',
+  'Gift', 'GlassWater', 'Globe', 'Goal', 'GraduationCap', 'Grape', 'Grid', 'Grip', 'Group', 'Hammer', 'Hand',
+  'HandCoins', 'HandHeart', 'HandHelping', 'HandPlatter', 'Handshake', 'HardDrive', 'HardHat', 'Haze',
+  'Heading', 'Heart', 'HelpCircle', 'Hexagon', 'Highlighter', 'History', 'Hotel', 'Hourglass', 'Image', 'Images',
+  'Inbox', 'IndianRupee', 'Info', 'Inspect', 'Joystick', 'Kanban', 'Key', 'Keyboard', 'Lamp', 'Languages', 'Laptop', 'Lasso', 'Laugh', 'Layers', 'LayoutDashboard',
+  'Leaf', 'Library', 'LifeBuoy', 'Lightbulb', 'Link', 'List',
+  'ListOrdered', 'ListTodo', 'Locate', 'Lock', 'Lollipop', 'Luggage', 'Magnet', 'Mail', 'Mailbox', 'Map', 'MapPin', 'Martini',
+  'Medal', 'Megaphone', 'Menu', 'MessageCircle', 'Mic', 'Microscope', 'Microwave', 'Milestone', 'Milk',
+  'Minus', 'Monitor', 'Moon', 'MoreHorizontal', 'Mountain', 'Mouse', 'MousePointer', 'Move', 'Music', 'Navigation', 'Network',
+  'Newspaper', 'Nut', 'Octagon', 'Option', 'Orbit', 'Package', 'PaintBucket', 'Paintbrush', 'Palmtree',
+  'Paperclip', 'ParkingCircle', 'PartyPopper', 'Pause', 'PcCase', 'Pen',
+  'PenTool', 'Percent', 'PersonStanding', 'Phone', 'PictureInPicture', 'Pilcrow', 'Pin', 'Pipette',
+  'Play', 'Plug', 'Pocket', 'Podcast', 'Pointer', 'PoundSterling', 'Power', 'Printer', 'Projector', 'Puzzle', 'QrCode', 'Quote',
+  'Rabbit', 'Radar', 'Radio', 'RadioReceiver', 'Rat', 'Receipt',
+  'Recycle', 'Refrigerator', 'Repeat', 'Rocket', 'RockingChair', 'Route', 'Router', 'Rows', 'Rss',
+  'Ruler', 'RussianRuble', 'Sailboat', 'Save', 'Scale', 'Scan', 'School', 'Scissors', 'ScreenShare', 'Scroll', 'Search', 'Send',
+  'Server', 'Share', 'Sheet', 'Shield', 'Ship', 'ShoppingBasket', 'Shovel', 'ShowerHead',
+  'Shrink', 'Shrub', 'Shuffle', 'Sigma', 'Signal', 'Siren', 'Smartphone', 'Smile', 'Snowflake', 'Sofa', 'Sprout', 'Square', 'Stamp',
+  'Sticker', 'StickyNote', 'Store', 'Strikethrough', 'Sun', 'Sunrise', 'Sunset', 'SwissFranc', 'SwitchCamera', 'Sword', 'Swords', 'Syringe', 'Table', 'Tablet', 'Tag',
+  'TargetIcon', 'Tent', 'Terminal', 'TestTube', 'Text', 'Thermometer', 'ThumbsDown',
+  'ThumbsUp', 'Ticket', 'Timer', 'ToggleLeft', 'ToggleRight', 'Tornado', 'Touchpad', 'TowerControl', 'ToyBrick', 'Tractor',
+  'Train', 'TreeDeciduous', 'TreePine', 'Trees', 'Trophy', 'Truck', 'Tv',
+  'Type', 'Underline', 'Unlock', 'Unplug', 'Upload', 'Usb',
+  'User', 'VenetianMask', 'Verified', 'Vibrate', 'Video', 'View',
+  'Voicemail', 'Volume', 'Vote', 'Wand', 'Warehouse', 'Waypoints', 'Webcam',
+  'Wheat', 'Wifi', 'Wind', 'Wine', 'Workflow', 'WrapText', 'Wrench', 'Youtube', 'ZapOff', 'ZoomIn', 'ZoomOut', 'Torus'
+];
+
+export const financeAndGeneralIcons: AvailableIconItem[] = allAvailableIcons.filter(icon =>
+  financeAndGeneralIconNames.includes(icon.name)
+).sort((a, b) => a.name.localeCompare(b.name));
+
 
 export const getDefaultIcon = () => Palette;

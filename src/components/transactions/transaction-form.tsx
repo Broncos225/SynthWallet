@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -13,7 +13,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -27,10 +27,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn, formatDate } from "@/lib/utils";
-import { CalendarIcon, Star, Info } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { cn, formatDate, normalizeString } from "@/lib/utils";
+import { CalendarIcon, Star, Info, UserPlus } from "lucide-react";
 import { useAppData } from "@/contexts/app-data-context";
-import type { Transaction, Category, ExpenseTemplate, Account, TransactionType, SavingGoal } from "@/types";
+import type { Transaction, Category, ExpenseTemplate, Account, TransactionType, SavingGoal, Payee } from "@/types";
 import { useState, useEffect } from "react";
 import { DEFAULT_CATEGORY_ID, DEFAULT_ACCOUNT_ID } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -42,20 +43,25 @@ import { useCurrencyInput } from "@/hooks/use-currency-input";
 const NONE_SUBCATEGORY_VALUE = "_NONE_SUBCATEGORY_VALUE_";
 const NONE_TEMPLATE_VALUE = "_NONE_TEMPLATE_VALUE_";
 const NONE_SAVING_GOAL_VALUE = "_NONE_SAVING_GOAL_VALUE_";
+const NONE_PAYEE_VALUE = "_NONE_PAYEE_VALUE_";
+const ADD_NEW_PAYEE_VALUE = "_ADD_NEW_PAYEE_";
 
 const transactionFormSchemaBase = z.object({
   type: z.enum(['expense', 'income', 'transfer'], { required_error: "Por favor selecciona un tipo de transacción." }),
   description: z.string().min(2, "La descripción debe tener al menos 2 caracteres."),
   amount: z.coerce.number({invalid_type_error: "El monto debe ser un número."}).positive("La cantidad debe ser positiva."),
   date: z.date({ required_error: "Por favor selecciona una fecha." }),
-  accountId: z.string().optional(), // Requerido para expense/income
-  fromAccountId: z.string().optional(), // Requerido para transfer
-  toAccountId: z.string().optional(), // Requerido para transfer
-  parentCategoryId: z.string().optional(), // Requerido para expense/income
+  accountId: z.string().optional(),
+  fromAccountId: z.string().optional(),
+  toAccountId: z.string().optional(),
+  parentCategoryId: z.string().optional(),
   subCategoryId: z.string().optional(),
-  payee: z.string().optional(),
+  payeeId: z.string().optional(),
+  newPayeeName: z.string().optional(),
   templateId: z.string().optional(),
   savingGoalId: z.string().optional(),
+  imageUrl: z.string().url("Debe ser una URL válida para la imagen.").optional().or(z.literal('')),
+  notes: z.string().max(500, "Las notas no pueden exceder los 500 caracteres.").optional(),
 });
 
 const transactionFormSchema = transactionFormSchemaBase.superRefine((data, ctx) => {
@@ -97,6 +103,16 @@ const transactionFormSchema = transactionFormSchemaBase.superRefine((data, ctx) 
       });
     }
   }
+
+  if (data.payeeId === ADD_NEW_PAYEE_VALUE) {
+    if (!data.newPayeeName || data.newPayeeName.trim().length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El nombre del nuevo beneficiario debe tener al menos 2 caracteres.",
+        path: ["newPayeeName"],
+      });
+    }
+  }
 });
 
 
@@ -130,9 +146,12 @@ const createDefaultFormValues = (
     toAccountId: transaction?.type === 'transfer' ? (transaction?.toAccountId || "") : "",
     parentCategoryId: category ? (category.parentId || category.id) : defaultParentCatId,
     subCategoryId: category?.parentId ? category.id : "",
-    payee: transaction?.payee || "",
+    payeeId: transaction?.payeeId || NONE_PAYEE_VALUE,
+    newPayeeName: "",
     templateId: NONE_TEMPLATE_VALUE,
     savingGoalId: transaction?.savingGoalId || NONE_SAVING_GOAL_VALUE,
+    imageUrl: transaction?.imageUrl || "",
+    notes: transaction?.notes || "",
   };
 };
 
@@ -152,6 +171,8 @@ export function TransactionForm({
     getCategoryById,
     getExpenseTemplates,
     accounts,
+    payees,
+    addPayee,
     savingGoals: allSavingGoals,
     formatUserCurrency,
   } = useAppData();
@@ -159,8 +180,9 @@ export function TransactionForm({
 
   const allParentCategoriesFromContext = getParentCategories();
   const [currentSubcategories, setCurrentSubcategories] = useState<Category[]>([]);
+  const [isAddingNewPayee, setIsAddingNewPayee] = useState(false);
   const transactionTemplates = getExpenseTemplates();
-  const activeSavingGoals = allSavingGoals.filter(g => g.status === 'active' || g.id === transactionToEdit?.savingGoalId);
+  const activeSavingGoals = allSavingGoals.filter(g => g.status === 'active' || g.id === transactionToEdit?.savingGoalId || g.id === transactionToPrefill?.savingGoalId);
 
   const isDebtRelatedTransaction = !!transactionToEdit?.relatedDebtTransactionId;
 
@@ -172,16 +194,26 @@ export function TransactionForm({
   const selectedParentCategoryId = form.watch("parentCategoryId");
   const selectedTemplateId = form.watch("templateId");
   const transactionType = form.watch("type");
+  const selectedPayeeId = form.watch("payeeId");
 
   useEffect(() => {
     if (transactionToEdit) {
       form.reset(createDefaultFormValues(transactionToEdit.type, transactionToEdit, getCategoryById));
     } else if (transactionToPrefill) {
-      form.reset(createDefaultFormValues(transactionToPrefill.type || initialType, transactionToPrefill, getCategoryById));
+      form.reset(createDefaultFormValues(transactionToPrefill.type || initialType || 'expense', transactionToPrefill, getCategoryById));
     } else {
       form.reset(createDefaultFormValues(initialType || 'expense', undefined, getCategoryById));
     }
   }, [transactionToEdit, transactionToPrefill, initialType, form, getCategoryById]);
+
+  useEffect(() => {
+    if (selectedPayeeId === ADD_NEW_PAYEE_VALUE) {
+      setIsAddingNewPayee(true);
+    } else {
+      setIsAddingNewPayee(false);
+      if(form.getValues("newPayeeName")) form.setValue("newPayeeName", "");
+    }
+  }, [selectedPayeeId, form]);
 
 
   useEffect(() => {
@@ -191,7 +223,7 @@ export function TransactionForm({
         const category = getCategoryById(template.categoryId);
         form.setValue("description", template.description || "");
         form.setValue("amount", template.amount);
-        form.setValue("payee", template.payee || "");
+        form.setValue("payeeId", template.payeeId || NONE_PAYEE_VALUE);
         if (category) {
           form.setValue("parentCategoryId", category.parentId || category.id);
           form.setValue("subCategoryId", category.parentId ? category.id : "");
@@ -200,8 +232,11 @@ export function TransactionForm({
           form.setValue("subCategoryId", "");
         }
         form.setValue("accountId", template.accountId || DEFAULT_ACCOUNT_ID);
-        form.setValue("type", "expense"); 
+        form.setValue("type", "expense");
         form.setValue("savingGoalId", NONE_SAVING_GOAL_VALUE);
+        form.setValue("imageUrl", "");
+        form.setValue("notes", "");
+        setIsAddingNewPayee(false);
       }
     }
   }, [selectedTemplateId, transactionTemplates, form, getCategoryById, isDebtRelatedTransaction, transactionToEdit, transactionToPrefill]);
@@ -213,12 +248,13 @@ export function TransactionForm({
     let subs: Category[] = [];
 
     if (currentType === 'transfer') {
-      parentIdToSet = ""; 
-      form.setValue('payee', '');
-      form.setValue('accountId', ""); 
+      parentIdToSet = "";
+      form.setValue('payeeId', NONE_PAYEE_VALUE);
+      form.setValue('accountId', "");
       if (!form.getValues('fromAccountId') && accounts.length > 0) form.setValue('fromAccountId', accounts[0]?.id || "");
       if (!form.getValues('toAccountId') && accounts.length > 1) form.setValue('toAccountId', accounts[1]?.id || accounts[0]?.id || "");
       else if (!form.getValues('toAccountId') && accounts.length === 1) form.setValue('toAccountId', accounts[0]?.id || "");
+      setIsAddingNewPayee(false);
     } else if (currentType === 'income') {
       parentIdToSet = "income";
       subs = getSubcategories("income");
@@ -234,7 +270,7 @@ export function TransactionForm({
       form.setValue('fromAccountId', "");
       form.setValue('toAccountId', "");
     }
-    
+
     form.setValue('parentCategoryId', parentIdToSet);
     setCurrentSubcategories(subs);
     const currentSubId = form.getValues("subCategoryId");
@@ -246,20 +282,19 @@ export function TransactionForm({
 
 
   useEffect(() => {
-    // This effect updates subcategories when parentCategoryId changes
     if (selectedParentCategoryId && selectedParentCategoryId !== "income") {
       const subs = getSubcategories(selectedParentCategoryId);
       setCurrentSubcategories(subs);
       const currentSubId = form.getValues("subCategoryId");
       if (currentSubId && !subs.find(s => s.id === currentSubId)) {
-         form.setValue("subCategoryId", ""); 
+         form.setValue("subCategoryId", "");
       }
     } else if (selectedParentCategoryId === "income") {
       const subs = getSubcategories("income");
       setCurrentSubcategories(subs);
        const currentSubId = form.getValues("subCategoryId");
       if (currentSubId && !subs.find(s => s.id === currentSubId)) {
-         form.setValue("subCategoryId", ""); 
+         form.setValue("subCategoryId", "");
       }
     } else {
       setCurrentSubcategories([]);
@@ -278,6 +313,37 @@ export function TransactionForm({
       return;
     }
 
+    let finalPayeeIdToSubmit = data.payeeId === NONE_PAYEE_VALUE || data.payeeId === ADD_NEW_PAYEE_VALUE ? null : data.payeeId;
+
+    if (data.payeeId === ADD_NEW_PAYEE_VALUE && data.newPayeeName) {
+      const normalizedNewName = normalizeString(data.newPayeeName);
+      const existingPayee = payees.find(p => normalizeString(p.name) === normalizedNewName);
+      if (existingPayee) {
+        toast({ variant: "destructive", title: "Beneficiario Duplicado", description: `El beneficiario "${data.newPayeeName}" ya existe.` });
+        form.setError("newPayeeName", { type: "manual", message: "Este beneficiario ya existe." });
+        return;
+      }
+      try {
+        const newPayee = await addPayee({ name: data.newPayeeName });
+        if (newPayee && newPayee.id) {
+          finalPayeeIdToSubmit = newPayee.id;
+          toast({ title: "Beneficiario Añadido", description: `"${data.newPayeeName}" ha sido añadido a tu lista.` });
+          setIsAddingNewPayee(false);
+          // The payee list in context will update, and the select will re-render.
+          // We might want to set the form's payeeId to the new ID for consistency if the form isn't immediately reset.
+          form.setValue("payeeId", newPayee.id);
+        } else {
+          toast({ variant: "destructive", title: "Error", description: "No se pudo añadir el nuevo beneficiario." });
+          return;
+        }
+      } catch (error) {
+        console.error("Error adding new payee:", error);
+        toast({ variant: "destructive", title: "Error", description: "Ocurrió un problema al añadir el beneficiario." });
+        return;
+      }
+    }
+
+
     const actualSubCategoryId = data.subCategoryId === NONE_SUBCATEGORY_VALUE ? undefined : data.subCategoryId;
     let finalCategoryId = (data.type === 'expense' || data.type === 'income') ? (actualSubCategoryId || data.parentCategoryId) : undefined;
 
@@ -289,28 +355,42 @@ export function TransactionForm({
 
     const finalSavingGoalId = data.savingGoalId === NONE_SAVING_GOAL_VALUE ? undefined : data.savingGoalId;
 
-    const transactionPayload: Omit<Transaction, 'id' | 'date' | 'relatedDebtTransactionId'> & {date: Date} = {
+    const transactionPayload: Omit<Transaction, 'id' | 'date' | 'relatedDebtTransactionId' | 'payee'> & { date: Date; payeeId?: string | null } = {
       description: data.description,
-      amount: data.amount, 
-      date: data.date, 
+      amount: data.amount,
+      date: data.date,
       categoryId: finalCategoryId,
-      payee: data.payee || null,
+      payeeId: finalPayeeIdToSubmit,
       accountId: data.type === 'transfer' ? (data.fromAccountId!) : (data.accountId!),
       type: data.type,
       fromAccountId: data.type === 'transfer' ? (data.fromAccountId || null) : null,
       toAccountId: data.type === 'transfer' ? (data.toAccountId || null) : null,
       savingGoalId: (data.type === 'expense' || data.type === 'income') ? finalSavingGoalId : null,
+      imageUrl: data.imageUrl || null,
+      notes: data.notes || null,
     };
+
+    if (transactionPayload.payeeId === undefined) {
+      delete transactionPayload.payeeId;
+    }
+
 
     if (transactionToEdit) {
       await updateTransaction({ ...transactionToEdit, ...transactionPayload, date: formatISO(data.date) });
       toast({ title: "¡Transacción Actualizada!", description: `"${data.description}" ha sido actualizada.` });
     } else {
+      // @ts-ignore - Omit 'payee' from the type for addTransaction, it's handled by payeeId
       await addTransaction(transactionPayload);
       toast({ title: "¡Transacción Guardada!", description: `"${data.description}" ha sido añadida.` });
     }
     onSave();
     dialogClose?.();
+     form.reset(createDefaultFormValues(
+        initialType || data.type, // Use the current type for reset
+        undefined,
+        getCategoryById
+      ));
+    setIsAddingNewPayee(false);
   }
 
   const payeeLabel = transactionType === 'income' ? "Pagador / Fuente (Opcional)" : "Beneficiario (Opcional)";
@@ -357,7 +437,7 @@ export function TransactionForm({
                       <SelectItem value={NONE_TEMPLATE_VALUE}>-- Ninguna Plantilla --</SelectItem>
                       {transactionTemplates.map((template) => (
                         <SelectItem key={template.id} value={template.id}>
-                          {template.name}
+                          {template.name} ({formatUserCurrency(template.amount)})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -402,7 +482,7 @@ export function TransactionForm({
             <FormItem>
               <FormLabel>Descripción</FormLabel>
               <FormControl>
-                <Input placeholder="Ej: Compras de supermercado, Salario mensual" {...field} disabled={isFieldDisabled} />
+                <Input placeholder="Ej: Compras de supermercado, Salario mensual" {...field} value={field.value || ""} disabled={isFieldDisabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -410,19 +490,63 @@ export function TransactionForm({
         />
 
         {(transactionType === 'expense' || transactionType === 'income') && (
-          <FormField
-            control={form.control}
-            name="payee"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{payeeLabel}</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej: Supermercado XYZ / Empresa ABC" {...field} disabled={isFieldDisabled} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+          <>
+            <FormField
+              control={form.control}
+              name="payeeId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{payeeLabel}</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value === ADD_NEW_PAYEE_VALUE) {
+                        setIsAddingNewPayee(true);
+                        form.setValue("newPayeeName", ""); // Clear if user types then changes mind
+                      } else {
+                        setIsAddingNewPayee(false);
+                      }
+                    }}
+                    value={field.value || NONE_PAYEE_VALUE}
+                    disabled={isFieldDisabled}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un beneficiario (opcional)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE_PAYEE_VALUE}>-- Ninguno --</SelectItem>
+                      {payees.map((payee: Payee) => (
+                        <SelectItem key={payee.id} value={payee.id}>
+                          {payee.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={ADD_NEW_PAYEE_VALUE}>
+                        <span className="flex items-center"><UserPlus className="h-4 w-4 mr-2" />Añadir Nuevo Beneficiario</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {isAddingNewPayee && (
+              <FormField
+                control={form.control}
+                name="newPayeeName"
+                render={({ field }) => (
+                  <FormItem className="pl-2 border-l-2 border-primary ml-1">
+                    <FormLabel className="text-sm">Nombre del Nuevo Beneficiario</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Escribe el nombre" {...field} autoFocus/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
-          />
+          </>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -591,6 +715,7 @@ export function TransactionForm({
                     <Select
                       onValueChange={(value) => {
                           field.onChange(value);
+                          form.setValue("subCategoryId", "");
                       }}
                       value={field.value || ""}
                       disabled={isFieldDisabled || transactionType === 'income'}
@@ -625,7 +750,7 @@ export function TransactionForm({
                 </FormItem>
                 )}
             />
-            {(currentSubcategories.length > 0 || (transactionToEdit && getCategoryById(transactionToEdit.categoryId || "")?.parentId)) && (
+            {(currentSubcategories.length > 0 || (transactionToEdit && getCategoryById(transactionToEdit.categoryId || "")?.parentId) || (transactionToPrefill && getCategoryById(transactionToPrefill.categoryId || "")?.parentId)) && (
                 <FormField
                 control={form.control}
                 name="subCategoryId"
@@ -691,6 +816,34 @@ export function TransactionForm({
           />
         )}
 
+        <FormField
+          control={form.control}
+          name="imageUrl"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>URL de la Imagen (Opcional)</FormLabel>
+              <FormControl>
+                <Input placeholder="https://ejemplo.com/imagen.png" {...field} value={field.value || ""} disabled={isFieldDisabled} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notas Adicionales (Opcional)</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Detalles adicionales, recordatorios, etc." {...field} value={field.value || ""} disabled={isFieldDisabled} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {!isFieldDisabled && (
           <Button type="submit" className="w-full">
             {transactionToEdit ? "Actualizar Transacción" : "Añadir Transacción"}
@@ -700,4 +853,3 @@ export function TransactionForm({
     </Form>
   );
 }
-

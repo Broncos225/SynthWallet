@@ -31,7 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn, formatDate } from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
 import { useAppData } from "@/contexts/app-data-context";
-import type { RecurringTransaction, Category, Account, TransactionType } from "@/types";
+import type { RecurringTransaction, Category, Account, TransactionType, Payee } from "@/types";
 import { useState, useEffect } from "react";
 import { DEFAULT_CATEGORY_ID, DEFAULT_ACCOUNT_ID } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,7 @@ import { useCurrencyInput } from "@/hooks/use-currency-input";
 import { Switch } from "@/components/ui/switch";
 
 const NONE_SUBCATEGORY_VALUE = "_NONE_SUBCATEGORY_VALUE_";
+const NONE_PAYEE_VALUE = "_NONE_PAYEE_VALUE_";
 
 const recurringTransactionFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
@@ -49,7 +50,7 @@ const recurringTransactionFormSchema = z.object({
   accountId: z.string().min(1, "Por favor selecciona una cuenta."),
   parentCategoryId: z.string().optional(),
   subCategoryId: z.string().optional(),
-  payee: z.string().optional(),
+  payeeId: z.string().optional(),
   frequency: z.enum(['daily', 'weekly', 'bi-weekly', 'monthly', 'yearly'], { required_error: "Por favor selecciona la frecuencia." }),
   startDate: z.date({ required_error: "Por favor selecciona una fecha de inicio." }),
   endDate: z.date().optional().nullable(),
@@ -88,6 +89,7 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
     updateRecurringTransaction,
     getCategoryById,
     accounts,
+    payees,
     formatUserCurrency,
   } = useAppData();
   const { toast } = useToast();
@@ -106,6 +108,7 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
           parentCategoryId: recordToEdit.categoryId ? (getCategoryById(recordToEdit.categoryId)?.parentId || recordToEdit.categoryId) : undefined,
           subCategoryId: recordToEdit.categoryId ? (getCategoryById(recordToEdit.categoryId)?.parentId ? recordToEdit.categoryId : undefined) : undefined,
           accountId: recordToEdit.accountId || DEFAULT_ACCOUNT_ID,
+          payeeId: recordToEdit.payeeId || NONE_PAYEE_VALUE,
           isActive: recordToEdit.isActive !== undefined ? recordToEdit.isActive : true,
         }
       : {
@@ -115,7 +118,7 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
           accountId: DEFAULT_ACCOUNT_ID,
           parentCategoryId: DEFAULT_CATEGORY_ID,
           subCategoryId: undefined,
-          payee: "",
+          payeeId: NONE_PAYEE_VALUE,
           frequency: 'monthly',
           startDate: startOfDay(new Date()),
           endDate: null,
@@ -152,6 +155,7 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
         parentCategoryId: category ? (category.parentId || category.id) : undefined,
         subCategoryId: category?.parentId ? category.id : undefined,
         accountId: recordToEdit.accountId || DEFAULT_ACCOUNT_ID,
+        payeeId: recordToEdit.payeeId || NONE_PAYEE_VALUE,
         isActive: recordToEdit.isActive !== undefined ? recordToEdit.isActive : true,
       });
     } else {
@@ -162,7 +166,7 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
         accountId: DEFAULT_ACCOUNT_ID,
         parentCategoryId: DEFAULT_CATEGORY_ID,
         subCategoryId: undefined,
-        payee: "",
+        payeeId: NONE_PAYEE_VALUE,
         frequency: 'monthly',
         startDate: startOfDay(new Date()),
         endDate: null,
@@ -176,19 +180,20 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
   async function onSubmit(data: RecurringTransactionFormValues) {
     const actualSubCategoryId = data.subCategoryId === NONE_SUBCATEGORY_VALUE ? undefined : data.subCategoryId;
     const finalCategoryId = (data.type === 'expense' || data.type === 'income') ? (actualSubCategoryId || data.parentCategoryId) : undefined;
+    const finalPayeeId = data.payeeId === NONE_PAYEE_VALUE ? null : data.payeeId;
 
     if ((data.type === 'expense' || data.type === 'income') && !finalCategoryId) {
         toast({variant: "destructive", title: "Error", description: "Se requiere una categoría para gastos o ingresos."});
         return;
     }
 
-    const recordData = {
+    const recordData: Omit<RecurringTransaction, 'id' | 'nextDueDate' | 'lastProcessedDate'> = {
       name: data.name,
       type: data.type as 'expense' | 'income',
       amount: data.amount,
       accountId: data.accountId,
-      categoryId: finalCategoryId,
-      payee: data.payee,
+      categoryId: finalCategoryId || null,
+      payeeId: finalPayeeId,
       frequency: data.frequency as RecurringTransaction['frequency'],
       startDate: formatISO(data.startDate),
       endDate: data.endDate ? formatISO(data.endDate) : null,
@@ -197,10 +202,11 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
     };
 
     if (recordToEdit) {
+      // @ts-ignore - id is present in recordToEdit
       await updateRecurringTransaction({ ...recordToEdit, ...recordData });
       toast({ title: "Recordatorio Actualizado", description: `"${data.name}" ha sido actualizado.` });
     } else {
-      await addRecurringTransaction(recordData as Omit<RecurringTransaction, 'id' | 'nextDueDate' | 'lastProcessedDate'>);
+      await addRecurringTransaction(recordData);
       toast({ title: "Recordatorio Guardado", description: `"${data.name}" ha sido añadido.` });
     }
     onSave();
@@ -368,15 +374,30 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
                   />
               )}
             </div>
-            <FormField
+             <FormField
               control={form.control}
-              name="payee"
+              name="payeeId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{payeeLabel}</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ej: Supermercado XYZ / Empresa ABC" {...field} />
-                  </FormControl>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || NONE_PAYEE_VALUE}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un beneficiario (opcional)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE_PAYEE_VALUE}>-- Ninguno --</SelectItem>
+                      {payees.map((payee: Payee) => (
+                        <SelectItem key={payee.id} value={payee.id}>
+                          {payee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -540,5 +561,7 @@ export function RecurringTransactionForm({ recordToEdit, onSave, dialogClose }: 
     </Form>
   );
 }
+
+    
 
     

@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Info, ArrowRightLeft } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Info, ArrowRightLeft, ImageIcon, StickyNote } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { CategoryIcon } from '@/components/expenses/category-icon';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,6 +34,7 @@ interface TransactionTableProps {
   transactions: Transaction[];
   onEdit: (transaction: Transaction) => void;
   onDelete: (transactionId: string) => void;
+  onViewDetails?: (transaction: Transaction) => void; // Added prop
   isLoading?: boolean;
   title?: string;
   itemsPerPage?: number;
@@ -43,6 +44,7 @@ export function TransactionTable({
   transactions,
   onEdit,
   onDelete,
+  onViewDetails, // Destructure prop
   isLoading,
   title = "Historial de Transacciones",
   itemsPerPage = 10,
@@ -116,6 +118,8 @@ export function TransactionTable({
                   <TableHead className="text-right px-1 sm:px-2">Monto</TableHead>
                   <TableHead className="hidden md:table-cell px-1 sm:px-2">Fecha</TableHead>
                   <TableHead className="hidden lg:table-cell px-1 sm:px-2">Benef./Fuente</TableHead>
+                  <TableHead className="hidden xl:table-cell px-1 sm:px-2">Img</TableHead>
+                  <TableHead className="hidden xl:table-cell px-1 sm:px-2">Notas</TableHead>
                   <TableHead className="text-right px-1 sm:px-2">Acción</TableHead>
                 </TableRow>
               </TableHeader>
@@ -163,7 +167,11 @@ export function TransactionTable({
                           </span>
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium truncate max-w-[80px] xs:max-w-[100px] sm:max-w-[150px] md:max-w-[200px] px-1 sm:px-2" title={transaction.description}>
+                      <TableCell 
+                        className="font-medium truncate max-w-[80px] xs:max-w-[100px] sm:max-w-[150px] md:max-w-[200px] px-1 sm:px-2 cursor-pointer hover:text-primary hover:underline" 
+                        title={`Ver detalles de: ${transaction.description}`}
+                        onClick={() => onViewDetails?.(transaction)}
+                      >
                         <div className="flex items-center gap-1">
                           {transaction.description}
                           {isDebtRelated && (
@@ -198,6 +206,34 @@ export function TransactionTable({
                       <TableCell className="hidden md:table-cell px-1 sm:px-2">{formatDate(transaction.date)}</TableCell>
                       <TableCell className="hidden lg:table-cell truncate max-w-[100px] xl:max-w-[150px] px-1 sm:px-2" title={transaction.payee || undefined}>
                           {transaction.payee || '-'}
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell px-1 sm:px-2">
+                        {transaction.imageUrl ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <a href={transaction.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                                <ImageIcon className="h-4 w-4" />
+                              </a>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Ver imagen (URL: {transaction.imageUrl})</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                       <TableCell className="hidden xl:table-cell truncate max-w-[100px] px-1 sm:px-2" title={transaction.notes || undefined}>
+                        {transaction.notes ? (
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                              <StickyNote className="h-4 w-4 text-muted-foreground cursor-help"/>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-sm">{transaction.notes}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className="text-right px-1 sm:px-2">
                         <DropdownMenu>

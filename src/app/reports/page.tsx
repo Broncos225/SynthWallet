@@ -7,6 +7,7 @@ import { BudgetComparisonChart } from '@/components/reports/budget-comparison-ch
 import { IncomeByCategoryPieChart } from '@/components/reports/income-by-category-pie-chart';
 import { IncomeExpenseTrendChart } from '@/components/reports/income-expense-trend-chart';
 import { SpendingByPayeeChart } from '@/components/reports/spending-by-payee-chart';
+import { DebtByPayeeChart } from '@/components/reports/debt-by-payee-chart'; // Nueva importación
 import { SummaryCard } from '@/components/dashboard/summary-card';
 import { MonthlyComparisonSummary } from '@/components/reports/monthly-comparison-summary';
 import { useAppData } from '@/contexts/app-data-context';
@@ -23,11 +24,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, TrendingDown, Scale, ListTree, CalendarDays } from 'lucide-react';
+import { TrendingUp, TrendingDown, Scale, ListTree, CalendarDays, HandCoins, Banknote } from 'lucide-react'; // Icons
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function ReportsPage() {
-  const { transactions: allTransactions, budgets, dataLoading, formatUserCurrency } = useAppData();
+  const { transactions: allTransactions, budgets, dataLoading, formatUserCurrency, debts } = useAppData();
   
   const currentMonthDate = new Date();
   const currentMonthYYYYMM = format(startOfMonth(currentMonthDate), 'yyyy-MM');
@@ -38,6 +39,7 @@ export default function ReportsPage() {
   const [comparisonMonth2, setComparisonMonth2] = useState(lastMonthYYYYMM);
 
   const safeTransactions = Array.isArray(allTransactions) ? allTransactions : [];
+  const safeDebts = Array.isArray(debts) ? debts : [];
   
   const transactionsForSelectedMonthCharts = safeTransactions.filter(t => t.date.startsWith(selectedMonthForCharts));
   const expensesForSelectedMonthCharts = transactionsForSelectedMonthCharts.filter(t => t.type === 'expense');
@@ -48,6 +50,12 @@ export default function ReportsPage() {
   const monthlyBalanceSelectedMonth = totalIncomeSelectedMonth - totalExpensesSelectedMonth;
   const totalTransactionsSelectedMonth = transactionsForSelectedMonthCharts.filter(t => t.type === 'expense' || t.type === 'income').length; 
   
+  const activeDebtsIOwe = safeDebts.filter(d => d.type === 'owed_by_me' && d.status !== 'pagada');
+  const totalAmountIOwe = activeDebtsIOwe.reduce((sum, d) => sum + d.currentBalance, 0);
+
+  const activeDebtsOwedToMe = safeDebts.filter(d => d.type === 'owed_to_me' && d.status !== 'pagada');
+  const totalAmountOwedToMe = activeDebtsOwedToMe.reduce((sum, d) => sum + d.currentBalance, 0);
+
   const formatMonthForDisplay = (monthString: string) => {
     if (!monthString || !dateFnsIsValid(parseISO(`${monthString}-01`))) return "Mes Inválido";
     return format(parseDateFns(monthString, 'yyyy-MM', new Date()), "MMMM", { locale: es });
@@ -72,21 +80,18 @@ export default function ReportsPage() {
         }
     });
 
-    // Add current and last month if not present
     months.add(currentMonthYYYYMM);
     months.add(lastMonthYYYYMM);
     
-    // Add several past and future months for broader selection
     for(let i=1; i<=12; i++) {
         months.add(format(subMonths(currentMonthDate, i), 'yyyy-MM'));
     }
-     for(let i=1; i<=3; i++) { // A few future months for budgeting ahead
+     for(let i=1; i<=3; i++) { 
         months.add(format(startOfMonth(addMonths(currentMonthDate, i)), 'yyyy-MM'));
     }
 
-
     return Array.from(months)
-      .sort((a, b) => b.localeCompare(a)) // Sort descending (most recent first)
+      .sort((a, b) => b.localeCompare(a)) 
       .map(month => ({
         value: month,
         label: formatMonthYearForDisplay(month),
@@ -100,14 +105,15 @@ export default function ReportsPage() {
           title="Reportes"
           description="Visualiza tus hábitos de gasto y el rendimiento de tu presupuesto."
         />
-        <div className="grid gap-2 grid-cols-1 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 grid-cols-1 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <Skeleton className="h-[100px] w-full" />
           <Skeleton className="h-[100px] w-full" />
           <Skeleton className="h-[100px] w-full" />
           <Skeleton className="h-[100px] w-full" />
+          <Skeleton className="h-[100px] w-full xl:col-span-2" /> {/* Skeletons for new debt summary cards */}
         </div>
-        <Skeleton className="h-[80px] w-full" /> {/* Skeleton for month selectors */}
-        <Skeleton className="h-[400px] w-full" /> {/* Skeleton for MonthlyComparisonSummary */}
+        <Skeleton className="h-[80px] w-full" />
+        <Skeleton className="h-[400px] w-full" />
         <Tabs defaultValue={currentMonthYYYYMM} className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:w-[400px] mb-4">
             <TabsTrigger value={currentMonthYYYYMM}>Este Mes ({formatMonthForDisplay(currentMonthYYYYMM)})</TabsTrigger>
@@ -123,6 +129,10 @@ export default function ReportsPage() {
           </TabsContent>
         </Tabs>
         <Skeleton className="h-[350px] w-full md:col-span-2" />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2"> {/* Skeletons for new debt charts */}
+            <Skeleton className="h-[350px] w-full" />
+            <Skeleton className="h-[350px] w-full" />
+        </div>
       </div>
     );
   }
@@ -134,7 +144,7 @@ export default function ReportsPage() {
         description="Visualiza tus hábitos de gasto y el rendimiento de tu presupuesto."
       />
 
-      <div className="grid gap-2 grid-cols-1 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 grid-cols-1 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <SummaryCard
           title={`Ingresos (${formatMonthForDisplay(selectedMonthForCharts)})`}
           value={formatUserCurrency(totalIncomeSelectedMonth)}
@@ -157,6 +167,20 @@ export default function ReportsPage() {
           title={`Transacciones (${formatMonthForDisplay(selectedMonthForCharts)})`}
           value={String(totalTransactionsSelectedMonth)}
           icon={ListTree}
+        />
+        <SummaryCard
+          title="Total que Debo (Activo)"
+          value={formatUserCurrency(totalAmountIOwe)}
+          icon={HandCoins}
+          iconColor="text-orange-500"
+          className="xl:col-span-2"
+        />
+        <SummaryCard
+          title="Total que Me Deben (Activo)"
+          value={formatUserCurrency(totalAmountOwedToMe)}
+          icon={Banknote}
+          iconColor="text-cyan-500"
+          className="xl:col-span-2"
         />
       </div>
       
@@ -211,12 +235,25 @@ export default function ReportsPage() {
             <SpendingPieChart transactions={expensesForSelectedMonthCharts} title={`Distribución de Gastos - ${formatMonthYearForDisplay(selectedMonthForCharts)}`} />
             <IncomeByCategoryPieChart transactions={incomeForSelectedMonthCharts} title={`Distribución de Ingresos - ${formatMonthYearForDisplay(selectedMonthForCharts)}`} />
             <BudgetComparisonChart budgets={budgets} transactions={transactionsForSelectedMonthCharts} month={selectedMonthForCharts} />
-            <SpendingByPayeeChart transactions={expensesForSelectedMonthCharts} title={`Principales Beneficiarios - ${formatMonthYearForDisplay(selectedMonthForCharts)}`} />
+            <SpendingByPayeeChart transactions={expensesForSelectedMonthCharts} title={`Principales Beneficiarios (Gastos) - ${formatMonthYearForDisplay(selectedMonthForCharts)}`} />
           </div>
         </TabsContent>
       </Tabs>
 
       <IncomeExpenseTrendChart transactions={safeTransactions} />
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 mt-6">
+        <DebtByPayeeChart
+          debts={safeDebts}
+          debtType="owed_by_me"
+          title="Deudas Por Pagar (Saldo Actual por Entidad)"
+        />
+        <DebtByPayeeChart
+          debts={safeDebts}
+          debtType="owed_to_me"
+          title="Cuentas Por Cobrar (Saldo Actual por Entidad)"
+        />
+      </div>
     </div>
   );
 }

@@ -24,9 +24,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAppData } from "@/contexts/app-data-context";
 import type { SavingGoal } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
-import { availableIcons, type AvailableIconItem, iconMap } from "@/lib/icon-map";
-import { Palette, CalendarIcon } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { financeAndGeneralIcons, type AvailableIconItem, iconMap } from "@/lib/icon-map";
+import { Palette, CalendarIcon, Search } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { CategoryIcon } from "@/components/expenses/category-icon";
 import { useCurrencyInput } from "@/hooks/use-currency-input";
@@ -54,6 +54,7 @@ interface SavingGoalFormProps {
 export function SavingGoalForm({ goalToEdit, onSave, dialogClose }: SavingGoalFormProps) {
   const { addSavingGoal, updateSavingGoal } = useAppData();
   const { toast } = useToast();
+  const [iconSearchTerm, setIconSearchTerm] = useState("");
 
   const form = useForm<SavingGoalFormValues>({
     resolver: zodResolver(savingGoalFormSchema),
@@ -101,20 +102,20 @@ export function SavingGoalForm({ goalToEdit, onSave, dialogClose }: SavingGoalFo
     const goalData = {
       name: data.name,
       targetAmount: data.targetAmount,
-      targetDate: data.targetDate, 
+      targetDate: data.targetDate,
       icon: data.icon,
       color: data.color || null,
     };
 
     if (goalToEdit) {
       await updateSavingGoal({
-        ...goalToEdit, // Includes id, currentAmount, creationDate, status
-        ...goalData, // Overwrites with new form data where applicable
+        ...goalToEdit,
+        ...goalData,
         targetDate: data.targetDate ? formatISO(data.targetDate, { representation: 'date' }) : null,
       });
       toast({ title: "Objetivo Actualizado", description: `El objetivo "${data.name}" ha sido actualizado.` });
     } else {
-      await addSavingGoal({ // currentAmount, creationDate, status handled by context
+      await addSavingGoal({
         ...goalData,
         targetDate: data.targetDate,
       });
@@ -124,6 +125,14 @@ export function SavingGoalForm({ goalToEdit, onSave, dialogClose }: SavingGoalFo
     onSave();
     dialogClose?.();
   }
+
+  const filteredIcons = useMemo(() => {
+    if (!iconSearchTerm) return financeAndGeneralIcons;
+    return financeAndGeneralIcons.filter(iconItem =>
+      iconItem.name.toLowerCase().includes(iconSearchTerm.toLowerCase())
+    );
+  }, [iconSearchTerm]);
+
 
   return (
     <Form {...form}>
@@ -219,11 +228,24 @@ export function SavingGoalForm({ goalToEdit, onSave, dialogClose }: SavingGoalFo
                 <span>Seleccionado:</span>
                 <CategoryIcon iconName={watchedIcon} color={watchedColor} size={6} />
               </div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    type="text"
+                    placeholder="Buscar icono..."
+                    value={iconSearchTerm}
+                    onChange={(e) => setIconSearchTerm(e.target.value)}
+                    className="mb-2 pl-8"
+                />
+              </div>
               <FormControl>
                 <ScrollArea className="h-[200px] w-full rounded-md border p-2 bg-background">
+                  {filteredIcons.length === 0 && (
+                    <p className="text-center text-muted-foreground py-4">No se encontraron iconos.</p>
+                  )}
                   <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
-                    {availableIcons.map((iconItem: AvailableIconItem) => {
-                      const IconComp = iconMap[iconItem.name] || Palette;
+                    {filteredIcons.map((iconItem: AvailableIconItem) => {
+                      const IconComp = iconItem.component || Palette;
                       const isSelected = field.value === iconItem.name;
                       return (
                         <Button
@@ -237,6 +259,7 @@ export function SavingGoalForm({ goalToEdit, onSave, dialogClose }: SavingGoalFo
                             isSelected && "ring-2 ring-ring ring-offset-2"
                           )}
                           aria-label={iconItem.name}
+                          title={iconItem.name}
                         >
                           <IconComp className="h-5 w-5" />
                         </Button>
@@ -289,4 +312,3 @@ export function SavingGoalForm({ goalToEdit, onSave, dialogClose }: SavingGoalFo
     </Form>
   );
 }
-

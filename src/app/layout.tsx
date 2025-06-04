@@ -26,13 +26,16 @@ export const metadata: Metadata = {
   appleWebAppCapable: "yes", // Maintained for wider iOS compatibility if needed
   appleWebAppStatusBarStyle: "default", // or "black", "black-translucent"
   appleWebAppTitle: siteConfig.name,
-  // For favicon and apple touch icons, you'd typically add more <link> tags here
-  // or ensure they are in the /public root and Next.js will pick them up.
-  // Example (Next.js might handle some of this automatically if icons are in /public):
-  // icons: {
-  //   icon: "/favicon.ico",
-  //   apple: "/apple-touch-icon.png",
-  // },
+  icons: {
+    icon: "/favicon.ico", // Standard favicon
+    apple: "/apple-touch-icon.png", // Example for Apple touch icon, ensure file exists in /public
+    // You can add other sizes or types here if needed
+    // shortcut: '/shortcut-icon.png',
+    // other: [
+    //   { rel: 'icon', url: '/favicon-16x16.png', sizes: '16x16' },
+    //   { rel: 'icon', url: '/favicon-32x32.png', sizes: '32x32' },
+    // ],
+  },
 };
 
 export default function RootLayout({

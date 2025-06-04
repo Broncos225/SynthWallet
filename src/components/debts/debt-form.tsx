@@ -27,70 +27,112 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, normalizeString } from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
 import { useAppData } from "@/contexts/app-data-context";
-import type { Debt } from "@/types";
+import type { Debt, Payee } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { es } from 'date-fns/locale';
+import { formatISO, parseISO, isValid } from 'date-fns';
 import { useCurrencyInput } from "@/hooks/use-currency-input";
+import { useEffect } from "react";
 
 const debtFormSchema = z.object({
   name: z.string().min(2, "La descripción debe tener al menos 2 caracteres."),
   type: z.enum(['owed_by_me', 'owed_to_me'], { required_error: "Por favor selecciona un tipo de deuda." }),
-  debtorOrCreditor: z.string().min(2, "El nombre de la persona/entidad es requerido."),
-  initialAmount: z.coerce.number({invalid_type_error: "El monto debe ser un número."}).positive("El monto inicial debe ser positivo."),
-  dueDate: z.date().optional(),
+  payeeId: z.string().min(1, "La persona/entidad es requerida."),
+  initialAmount: z.coerce.number({invalid_type_error: "El monto debe ser un número."}).min(0, "El monto inicial no puede ser negativo."),
+  dueDate: z.date().optional().nullable(),
 });
 
 type DebtFormValues = z.infer<typeof debtFormSchema>;
 
 interface DebtFormProps {
-  debtToEdit?: Debt; 
+  debtToEdit?: Debt;
   onSave: () => void;
   dialogClose?: () => void;
 }
 
 export function DebtForm({ debtToEdit, onSave, dialogClose }: DebtFormProps) {
-  const { addDebt } = useAppData(); // Add updateDebt if needed
+  const { addDebt, updateDebt, getTransactionsForDebt, payees, getPayeeById, getPayeeByName } = useAppData();
   const { toast } = useToast();
+
+  const isInitialAmountEditable = !debtToEdit || getTransactionsForDebt(debtToEdit.id).length === 0;
+
+  const getDefaultPayeeId = () => {
+    if (debtToEdit) {
+      if (debtToEdit.payeeId) return debtToEdit.payeeId;
+      // Try to find a payee matching the old debtorOrCreditor string
+      const existingPayee = getPayeeByName(debtToEdit.debtorOrCreditor);
+      if (existingPayee) return existingPayee.id;
+    }
+    return ""; // Default to empty if no match or not editing
+  }
 
   const form = useForm<DebtFormValues>({
     resolver: zodResolver(debtFormSchema),
-    defaultValues: debtToEdit
-      ? {
-          ...debtToEdit,
-          initialAmount: Number(debtToEdit.initialAmount),
-          dueDate: debtToEdit.dueDate ? new Date(debtToEdit.dueDate) : undefined,
-        }
-      : {
-          name: "",
-          type: undefined, 
-          debtorOrCreditor: "",
-          initialAmount: undefined,
-          dueDate: undefined,
-        },
+    defaultValues: {
+      name: debtToEdit?.name || "",
+      type: debtToEdit?.type || undefined,
+      payeeId: getDefaultPayeeId(),
+      initialAmount: debtToEdit ? Number(debtToEdit.initialAmount) : undefined,
+      dueDate: debtToEdit?.dueDate && isValid(parseISO(debtToEdit.dueDate)) ? parseISO(debtToEdit.dueDate) : null,
+    },
   });
 
-  async function onSubmit(data: DebtFormValues) {
+  useEffect(() => {
     if (debtToEdit) {
-      // TODO: Implement updateDebt functionality
-      // await updateDebt({ ...debtToEdit, ...data, dueDate: data.dueDate ? formatISO(data.dueDate) : undefined });
+      form.reset({
+        name: debtToEdit.name,
+        type: debtToEdit.type,
+        payeeId: getDefaultPayeeId(),
+        initialAmount: Number(debtToEdit.initialAmount),
+        dueDate: debtToEdit.dueDate && isValid(parseISO(debtToEdit.dueDate)) ? parseISO(debtToEdit.dueDate) : null,
+      });
+    } else {
+      form.reset({
+        name: "",
+        type: undefined,
+        payeeId: "",
+        initialAmount: undefined,
+        dueDate: null,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debtToEdit, form]);
+
+
+  async function onSubmit(data: DebtFormValues) {
+    const selectedPayee = getPayeeById(data.payeeId);
+    const debtorOrCreditorName = selectedPayee?.name || "Desconocido";
+
+    if (debtToEdit) {
+      const payloadForUpdate: Partial<Debt> & { id: string } = {
+        id: debtToEdit.id,
+        name: data.name,
+        type: data.type,
+        payeeId: data.payeeId,
+        debtorOrCreditor: debtorOrCreditorName, // Update this for display consistency
+        initialAmount: isInitialAmountEditable ? data.initialAmount : debtToEdit.initialAmount,
+        dueDate: data.dueDate ? data.dueDate : null,
+      };
+      await updateDebt(payloadForUpdate);
       toast({ title: "¡Deuda Actualizada!", description: `"${data.name}" ha sido actualizada.` });
     } else {
       const newDebtData = {
         name: data.name,
         type: data.type,
-        debtorOrCreditor: data.debtorOrCreditor,
-        initialAmount: data.initialAmount, // RHF data.initialAmount is already a number
-        dueDate: data.dueDate, 
+        payeeId: data.payeeId,
+        debtorOrCreditor: debtorOrCreditorName, // Set this for display consistency
+        initialAmount: data.initialAmount,
+        dueDate: data.dueDate,
       };
-      addDebt(newDebtData);
+      await addDebt(newDebtData);
       toast({ title: "¡Deuda Añadida!", description: `"${data.name}" ha sido añadida.` });
     }
     onSave();
     dialogClose?.();
-    form.reset();
+    form.reset({ name: "", type: undefined, payeeId: "", initialAmount: undefined, dueDate: null });
   }
 
   return (
@@ -132,13 +174,24 @@ export function DebtForm({ debtToEdit, onSave, dialogClose }: DebtFormProps) {
         />
         <FormField
           control={form.control}
-          name="debtorOrCreditor"
+          name="payeeId"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Persona o Entidad</FormLabel>
-              <FormControl>
-                <Input placeholder="Ej. Banco XYZ, Juan Pérez" {...field} />
-              </FormControl>
+              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona persona/entidad" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {payees.map((payee: Payee) => (
+                    <SelectItem key={payee.id} value={payee.id}>
+                      {payee.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
@@ -155,16 +208,22 @@ export function DebtForm({ debtToEdit, onSave, dialogClose }: DebtFormProps) {
               <FormItem>
                 <FormLabel>Monto Inicial</FormLabel>
                 <FormControl>
-                  <Input 
+                  <Input
                     {...inputProps}
                     onBlur={(e) => {
                         inputProps.onBlur(e);
                         rhfField.onBlur();
                     }}
                     ref={rhfField.ref}
+                    disabled={!isInitialAmountEditable && !!debtToEdit}
                   />
                 </FormControl>
                 <FormMessage />
+                {!isInitialAmountEditable && !!debtToEdit && (
+                  <p className="text-xs text-muted-foreground">
+                    El monto inicial no se puede editar si la deuda ya tiene abonos.
+                  </p>
+                )}
               </FormItem>
             );
           }}
@@ -186,7 +245,7 @@ export function DebtForm({ debtToEdit, onSave, dialogClose }: DebtFormProps) {
                       )}
                     >
                       {field.value ? (
-                        formatDate(field.value.toISOString())
+                        formatDate(field.value)
                       ) : (
                         <span>Elige una fecha</span>
                       )}
@@ -204,6 +263,16 @@ export function DebtForm({ debtToEdit, onSave, dialogClose }: DebtFormProps) {
                   />
                 </PopoverContent>
               </Popover>
+               <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => field.onChange(null)}
+                  className="mt-1 text-xs self-start"
+                  disabled={!field.value}
+                >
+                  Limpiar fecha
+              </Button>
               <FormMessage />
             </FormItem>
           )}

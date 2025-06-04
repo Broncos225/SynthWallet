@@ -7,8 +7,6 @@ function escapeCSVField(field: string | number | null | undefined): string {
     return '';
   }
   const stringField = String(field);
-  // If the field contains a comma, double quote, or newline, wrap it in double quotes
-  // and escape any existing double quotes by doubling them.
   if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
     return `"${stringField.replace(/"/g, '""')}"`;
   }
@@ -29,7 +27,8 @@ export function exportTransactionsToCSV(
   const headers = [
     'Fecha', 'Tipo', 'Descripción', 'Categoría', 'Cuenta', 
     'Desde Cuenta', 'A Cuenta', 'Beneficiario/Pagador', 'Monto', 
-    'Objetivo de Ahorro', 'ID Transacción Deuda Relacionada', 'ID Transacción'
+    'Objetivo de Ahorro', 'Imagen URL', 'Notas', 
+    'ID Transacción Deuda Relacionada', 'ID Transacción'
   ];
 
   const csvRows = [headers.join(',')];
@@ -44,8 +43,10 @@ export function exportTransactionsToCSV(
       escapeCSVField(t.type === 'transfer' ? getAccountName(t.fromAccountId) : ''),
       escapeCSVField(t.type === 'transfer' ? getAccountName(t.toAccountId) : ''),
       escapeCSVField(t.payee),
-      t.amount.toFixed(2), // Raw number with 2 decimal places, using dot as separator
+      t.amount.toFixed(2), 
       escapeCSVField(getSavingGoalName(t.savingGoalId)),
+      escapeCSVField(t.imageUrl),
+      escapeCSVField(t.notes),
       escapeCSVField(t.relatedDebtTransactionId),
       escapeCSVField(t.id)
     ];
@@ -69,3 +70,5 @@ export function exportTransactionsToCSV(
     alert('La exportación a CSV no es soportada por tu navegador.');
   }
 }
+
+    

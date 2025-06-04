@@ -10,12 +10,11 @@ import { useAppData } from '@/contexts/app-data-context';
 import { useToast } from '@/hooks/use-toast';
 import { exportTransactionsToCSV } from '@/lib/csv-utils';
 import type { Transaction, TransactionType } from '@/types';
-import { parseISO, isValid as dateIsValid } from 'date-fns'; // Removed formatISO as it's not used here
+import { parseISO, isValid as dateIsValid } from 'date-fns'; 
 import { DEFAULT_CATEGORY_ID, DEFAULT_ACCOUNT_ID } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UploadCloud, Download, AlertTriangle, Upload } from "lucide-react"; // Added Upload icon
+import { UploadCloud, Download, AlertTriangle, Upload } from "lucide-react"; 
 
-// Helper to parse a CSV line, handles simple quoted fields
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let currentField = '';
@@ -24,7 +23,7 @@ function parseCSVLine(line: string): string[] {
     const char = line[i];
     if (char === '"') {
       if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
-        currentField += '"'; // Escaped quote
+        currentField += '"'; 
         i++;
       } else {
         inQuotes = !inQuotes;
@@ -36,7 +35,7 @@ function parseCSVLine(line: string): string[] {
       currentField += char;
     }
   }
-  result.push(currentField); // Add last field
+  result.push(currentField); 
   return result.map(field => field.trim());
 }
 
@@ -96,10 +95,13 @@ export function DataImportExport() {
       }
 
       const headers = parseCSVLine(lines[0]);
-      const expectedHeaders = ['Fecha','Tipo','Descripción','Categoría','Cuenta','Desde Cuenta','A Cuenta','Beneficiario/Pagador','Monto','Objetivo de Ahorro'];
+      const expectedHeaders = ['Fecha','Tipo','Descripción','Categoría','Cuenta','Desde Cuenta','A Cuenta','Beneficiario/Pagador','Monto','Objetivo de Ahorro', 'Imagen URL', 'Notas', 'ID Transacción Deuda Relacionada', 'ID Transacción'];
+      // Check only the first N headers we care about for import
+      const headersToValidate = expectedHeaders.slice(0, 12);
 
-      if(!expectedHeaders.every((h, i) => headers[i]?.trim().toLowerCase() === h.toLowerCase())) {
-        setImportErrors(prev => [...prev, `Encabezados CSV inválidos. Esperado: ${expectedHeaders.join(', ')}. Encontrado: ${headers.join(', ')}`]);
+
+      if(!headersToValidate.every((h, i) => headers[i]?.trim().toLowerCase() === h.toLowerCase())) {
+        setImportErrors(prev => [...prev, `Encabezados CSV inválidos. Esperado (primeros 12): ${headersToValidate.join(', ')}. Encontrado: ${headers.slice(0,12).join(', ')}`]);
         setIsImporting(false);
         return;
       }
@@ -110,15 +112,17 @@ export function DataImportExport() {
 
       for (let i = 1; i < lines.length; i++) {
         const fields = parseCSVLine(lines[i]);
-        if (fields.length < expectedHeaders.length) {
-          localImportErrors.push(`Fila ${i + 1}: Número incorrecto de campos. Se esperaban ${expectedHeaders.length}, se encontraron ${fields.length}.`);
+        // Allow more fields than expected for flexibility, but require at least the ones we process
+        if (fields.length < headersToValidate.length) { 
+          localImportErrors.push(`Fila ${i + 1}: Número incorrecto de campos. Se esperaban al menos ${headersToValidate.length}, se encontraron ${fields.length}.`);
           errorCount++;
           continue;
         }
 
         const [
           dateStr, typeStr, description, categoryName, accountName,
-          fromAccountName, toAccountName, payee, amountStr, savingGoalNameStr
+          fromAccountName, toAccountName, payee, amountStr, savingGoalNameStr,
+          imageUrlStr, notesStr 
         ] = fields;
 
         const date = parseISO(dateStr);
@@ -181,6 +185,8 @@ export function DataImportExport() {
             toAccountId: toAccId,
             payee: payee || null,
             savingGoalId: savingGoal?.id || null,
+            imageUrl: imageUrlStr || null,
+            notes: notesStr || null,
           });
           successCount++;
         } catch (e: any) {
@@ -191,7 +197,7 @@ export function DataImportExport() {
       setImportErrors(localImportErrors);
       toast({
         title: "Importación Completada",
-        description: `${successCount} transacciones importadas. ${errorCount} filas con errores.`,
+        description: `${successCount} transacciones importadas. ${errorCount > 0 ? `${errorCount} filas con errores.` : ''}`,
         duration: errorCount > 0 ? 10000 : 5000,
       });
       setIsImporting(false);
@@ -216,7 +222,7 @@ export function DataImportExport() {
           <CardDescription>
             Sube un archivo CSV para importar transacciones. Asegúrate de que el archivo siga el formato de exportación:
             <br />
-            <code className="text-xs bg-muted p-1 rounded">Fecha,Tipo,Descripción,Categoría,Cuenta,Desde Cuenta,A Cuenta,Beneficiario/Pagador,Monto,Objetivo de Ahorro,...</code>
+            <code className="text-xs bg-muted p-1 rounded">Fecha,Tipo,Descripción,Categoría,Cuenta,Desde Cuenta,A Cuenta,Beneficiario/Pagador,Monto,Objetivo de Ahorro,Imagen URL,Notas,...</code>
             <br/>
             Las categorías, cuentas y objetivos de ahorro se buscarán por nombre. Si no se encuentran, se usarán valores predeterminados.
           </CardDescription>
@@ -267,3 +273,5 @@ export function DataImportExport() {
     </div>
   );
 }
+
+    

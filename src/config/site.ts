@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, CreditCard, Target, BarChartHorizontalBig, Settings, Star, Tags, ReceiptText, Wallet, Goal, Repeat, UploadCloud, Palette, Bell } from "lucide-react"; // Bell icon added
+import { LayoutDashboard, CreditCard, Target, BarChartHorizontalBig, Settings, Star, Tags, ReceiptText, Wallet, Goal, Repeat, UploadCloud, Palette, Users, Calculator } from "lucide-react";
 
 export type NavItem = {
   title: string;
@@ -54,6 +54,11 @@ export const siteConfig: SiteConfig = {
       icon: Repeat,
     },
     {
+      title: "Dividir Gastos",
+      href: "/split-bill",
+      icon: Calculator,
+    },
+    {
       title: "Reportes",
       href: "/reports",
       icon: BarChartHorizontalBig,
@@ -84,6 +89,12 @@ export const siteConfig: SiteConfig = {
       description: "Administra tus cuentas bancarias, de efectivo y otras."
     },
     {
+      title: "Beneficiarios",
+      href: "/settings/payees",
+      icon: Users,
+      description: "Gestiona tu lista de beneficiarios y pagadores frecuentes."
+    },
+    {
       title: "Apariencia",
       href: "/settings/appearance",
       icon: Palette,
@@ -94,12 +105,6 @@ export const siteConfig: SiteConfig = {
       href: "/settings/data",
       icon: UploadCloud,
       description: "Importa o exporta tus datos de transacciones."
-    },
-    {
-      title: "Notificaciones",
-      href: "/settings/notifications",
-      icon: Bell,
-      description: "Configura y gestiona las notificaciones de la aplicación."
     }
   ]
 };

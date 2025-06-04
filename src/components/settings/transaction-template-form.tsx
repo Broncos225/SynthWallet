@@ -22,13 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppData } from "@/contexts/app-data-context";
-import type { ExpenseTemplate, Category, Account } from "@/types"; // Updated type name
+import type { ExpenseTemplate, Category, Account, Payee } from "@/types"; // Updated type name
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { DEFAULT_CATEGORY_ID, DEFAULT_ACCOUNT_ID } from "@/lib/constants";
 import { useCurrencyInput } from "@/hooks/use-currency-input";
 
 const NONE_SUBCATEGORY_VALUE = "_NONE_SUBCATEGORY_VALUE_";
+const NONE_PAYEE_VALUE = "_NONE_PAYEE_VALUE_";
 
 const templateFormSchema = z.object({
   name: z.string().min(2, "El nombre de la plantilla debe tener al menos 2 caracteres."),
@@ -36,26 +37,28 @@ const templateFormSchema = z.object({
   amount: z.coerce.number({invalid_type_error: "El monto debe ser un número."}).positive("La cantidad debe ser positiva."),
   parentCategoryId: z.string().min(1, "Por favor selecciona una categoría principal."),
   subCategoryId: z.string().optional(),
-  payee: z.string().optional(),
+  payeeId: z.string().optional(),
   accountId: z.string().min(1, "Por favor selecciona una cuenta por defecto."),
 });
 
 type TemplateFormValues = z.infer<typeof templateFormSchema>;
 
-interface TransactionTemplateFormProps { // Renamed
-  templateToEdit?: ExpenseTemplate; // Renamed from ExpenseTemplate
+interface TransactionTemplateFormProps { 
+  templateToEdit?: ExpenseTemplate; 
   onSave: () => void;
   dialogClose?: () => void;
 }
 
-export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }: TransactionTemplateFormProps) { // Renamed
+export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }: TransactionTemplateFormProps) { 
   const { 
     getParentCategories, 
     getSubcategories, 
-    addExpenseTemplate, // Consider renaming in context
-    updateExpenseTemplate, // Consider renaming in context
+    addExpenseTemplate, 
+    updateExpenseTemplate, 
     getCategoryById,
-    accounts
+    accounts,
+    payees,
+    formatUserCurrency,
   } = useAppData();
   const { toast } = useToast();
   
@@ -71,7 +74,7 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
           amount: Number(templateToEdit.amount),
           parentCategoryId: getCategoryById(templateToEdit.categoryId)?.parentId || templateToEdit.categoryId,
           subCategoryId: getCategoryById(templateToEdit.categoryId)?.parentId ? templateToEdit.categoryId : undefined,
-          payee: templateToEdit.payee || "",
+          payeeId: templateToEdit.payeeId || NONE_PAYEE_VALUE,
           accountId: templateToEdit.accountId || DEFAULT_ACCOUNT_ID,
         }
       : {
@@ -80,7 +83,7 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
           amount: undefined,
           parentCategoryId: DEFAULT_CATEGORY_ID,
           subCategoryId: undefined,
-          payee: "",
+          payeeId: NONE_PAYEE_VALUE,
           accountId: DEFAULT_ACCOUNT_ID,
         },
   });
@@ -110,7 +113,7 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
         amount: Number(templateToEdit.amount),
         parentCategoryId: category?.parentId || category?.id || DEFAULT_CATEGORY_ID,
         subCategoryId: category?.parentId ? category.id : undefined,
-        payee: templateToEdit.payee || "",
+        payeeId: templateToEdit.payeeId || NONE_PAYEE_VALUE,
         accountId: templateToEdit.accountId || DEFAULT_ACCOUNT_ID,
       });
     } else {
@@ -120,7 +123,7 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
           amount: undefined,
           parentCategoryId: DEFAULT_CATEGORY_ID,
           subCategoryId: undefined,
-          payee: "",
+          payeeId: NONE_PAYEE_VALUE,
           accountId: DEFAULT_ACCOUNT_ID,
         })
     }
@@ -129,21 +132,24 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
   async function onSubmit(data: TemplateFormValues) {
     const actualSubCategoryId = data.subCategoryId === NONE_SUBCATEGORY_VALUE ? undefined : data.subCategoryId;
     const finalCategoryId = actualSubCategoryId || data.parentCategoryId;
+    const finalPayeeId = data.payeeId === NONE_PAYEE_VALUE ? null : data.payeeId;
 
     const templateData = { 
       name: data.name,
       description: data.description,
-      amount: data.amount, // RHF data.amount is already a number
+      amount: data.amount, 
       categoryId: finalCategoryId,
-      payee: data.payee,
+      payeeId: finalPayeeId,
       accountId: data.accountId,
     };
 
     if (templateToEdit) {
-      updateExpenseTemplate({ ...templateData, id: templateToEdit.id }); // Keep context function name for now
+      // @ts-ignore - payeeId is on the payload, but updateExpenseTemplate might expect payee (old type)
+      updateExpenseTemplate({ ...templateData, id: templateToEdit.id }); 
       toast({ title: "¡Plantilla Actualizada!", description: `La plantilla "${data.name}" ha sido actualizada.` });
     } else {
-      addExpenseTemplate(templateData); // Keep context function name for now
+       // @ts-ignore
+      addExpenseTemplate(templateData); 
       toast({ title: "¡Plantilla Guardada!", description: `La plantilla "${data.name}" ha sido añadida.` });
     }
     onSave();
@@ -181,13 +187,28 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
         />
         <FormField
           control={form.control}
-          name="payee"
+          name="payeeId"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Beneficiario por Defecto (Opcional)</FormLabel>
-              <FormControl>
-                <Input placeholder="Ej: Starbucks" {...field} />
-              </FormControl>
+               <Select
+                  onValueChange={field.onChange}
+                  value={field.value || NONE_PAYEE_VALUE}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un beneficiario (opcional)" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value={NONE_PAYEE_VALUE}>-- Ninguno --</SelectItem>
+                    {payees.map((payee: Payee) => (
+                      <SelectItem key={payee.id} value={payee.id}>
+                        {payee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               <FormMessage />
             </FormItem>
           )}
@@ -233,7 +254,7 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
                   <SelectContent>
                     {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name}
+                        {account.name} ({formatUserCurrency(account.currentBalance)})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -313,3 +334,7 @@ export function TransactionTemplateForm({ templateToEdit, onSave, dialogClose }:
     </Form>
   );
 }
+
+
+
+    

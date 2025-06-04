@@ -24,11 +24,11 @@ import {
 import { useAppData } from "@/contexts/app-data-context";
 import type { Account } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
-import { iconMap, availableIcons, type AvailableIconItem } from "@/lib/icon-map";
-import { Palette } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { financeAndGeneralIcons, type AvailableIconItem, iconMap } from "@/lib/icon-map";
+import { Palette, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CategoryIcon } from "@/components/expenses/category-icon"; 
+import { CategoryIcon } from "@/components/expenses/category-icon";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCurrencyInput } from "@/hooks/use-currency-input";
 
@@ -62,6 +62,7 @@ const accountTypes = [
 export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormProps) {
   const { addAccount, updateAccount } = useAppData();
   const { toast } = useToast();
+  const [iconSearchTerm, setIconSearchTerm] = useState("");
 
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
@@ -90,7 +91,7 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
       form.reset({
         name: accountToEdit.name,
         type: accountToEdit.type,
-        initialBalance: accountToEdit.initialBalance, 
+        initialBalance: accountToEdit.initialBalance,
         icon: accountToEdit.icon || "Wallet",
         color: accountToEdit.color || "",
       });
@@ -109,22 +110,29 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
     const accountData = {
       name: data.name,
       type: data.type,
-      initialBalance: data.initialBalance, 
+      initialBalance: data.initialBalance,
       icon: data.icon,
-      color: data.color || null, 
+      color: data.color || null,
     };
 
     if (accountToEdit) {
       await updateAccount({ ...accountData, id: accountToEdit.id, currentBalance: accountToEdit.currentBalance });
       toast({ title: "Cuenta Actualizada", description: `La cuenta "${data.name}" ha sido actualizada.` });
     } else {
-      await addAccount(accountData); 
+      await addAccount(accountData);
       toast({ title: "Cuenta Añadida", description: `La cuenta "${data.name}" ha sido añadida.` });
     }
-    
+
     onSave();
     dialogClose?.();
   }
+
+  const filteredIcons = useMemo(() => {
+    if (!iconSearchTerm) return financeAndGeneralIcons;
+    return financeAndGeneralIcons.filter(iconItem =>
+      iconItem.name.toLowerCase().includes(iconSearchTerm.toLowerCase())
+    );
+  }, [iconSearchTerm]);
 
   return (
     <Form {...form}>
@@ -167,7 +175,7 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="initialBalance"
@@ -180,14 +188,14 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
               <FormItem>
                 <FormLabel>Saldo Inicial</FormLabel>
                 <FormControl>
-                  <Input 
+                  <Input
                     {...inputProps}
                     onBlur={(e) => {
                         inputProps.onBlur(e);
                         rhfField.onBlur();
                     }}
                     ref={rhfField.ref}
-                    disabled={!!accountToEdit} 
+                    disabled={!!accountToEdit}
                   />
                 </FormControl>
                 {!accountToEdit && <FormMessage />}
@@ -207,11 +215,24 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
                 <span>Seleccionado:</span>
                 <CategoryIcon iconName={watchedIcon} color={watchedColor} size={6} />
               </div>
+              <div className="relative">
+                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    type="text"
+                    placeholder="Buscar icono..."
+                    value={iconSearchTerm}
+                    onChange={(e) => setIconSearchTerm(e.target.value)}
+                    className="mb-2 pl-8"
+                />
+              </div>
               <FormControl>
                 <ScrollArea className="h-[200px] w-full rounded-md border p-2 bg-background">
+                 {filteredIcons.length === 0 && (
+                    <p className="text-center text-muted-foreground py-4">No se encontraron iconos.</p>
+                  )}
                   <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
-                    {availableIcons.map((iconItem: AvailableIconItem) => {
-                      const IconComp = iconMap[iconItem.name] || Palette;
+                    {filteredIcons.map((iconItem: AvailableIconItem) => {
+                      const IconComp = iconItem.component || Palette;
                       const isSelected = field.value === iconItem.name;
                       return (
                         <Button
@@ -221,10 +242,11 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
                           type="button"
                           onClick={() => field.onChange(iconItem.name)}
                           className={cn(
-                            "p-2 flex justify-center items-center h-10 w-10", 
+                            "p-2 flex justify-center items-center h-10 w-10",
                             isSelected && "ring-2 ring-ring ring-offset-2"
                           )}
                           aria-label={iconItem.name}
+                          title={iconItem.name}
                         >
                           <IconComp className="h-5 w-5" />
                         </Button>
@@ -237,7 +259,7 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="color"
@@ -246,16 +268,16 @@ export function AccountForm({ accountToEdit, onSave, dialogClose }: AccountFormP
               <FormLabel>Color (Opcional)</FormLabel>
               <div className="flex items-center gap-2">
                 <FormControl>
-                  <input 
-                    type="color" 
+                  <input
+                    type="color"
                     className="p-0 h-8 w-8 rounded-md border-0 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    value={field.value || '#000000'} 
-                    onChange={(e) => field.onChange(e.target.value === '#000000' && !accountToEdit?.color ? '' : e.target.value)} 
+                    value={field.value || '#000000'}
+                    onChange={(e) => field.onChange(e.target.value === '#000000' && !accountToEdit?.color ? '' : e.target.value)}
                   />
                 </FormControl>
-                <Input 
-                    type="text" 
-                    placeholder="#RRGGBB" 
+                <Input
+                    type="text"
+                    placeholder="#RRGGBB"
                     value={field.value || ''}
                     onChange={(e) => field.onChange(e.target.value)}
                     className="max-w-[120px]"

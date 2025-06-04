@@ -217,3 +217,4 @@ export function DebtTransactionForm({ debt, onSave, dialogClose }: DebtTransacti
     </Form>
   );
 }
+

@@ -188,9 +188,13 @@ export function calculateNextDueDate(
             break;
       }
   }
-
-
   return formatISO(nextDueDate, { representation: 'date' });
 }
 
-
+export function normalizeString(str: string): string {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .normalize("NFD") // Decompose combined graphemes into base characters and diacritical marks
+    .replace(/[\u0300-\u036f]/g, ""); // Remove diacritical marks
+}

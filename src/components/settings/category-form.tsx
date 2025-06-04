@@ -25,10 +25,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAppData } from "@/contexts/app-data-context";
 import type { Category } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
-import { availableIcons, type AvailableIconItem, iconMap } from "@/lib/icon-map";
+import { useEffect, useState, useMemo } from "react";
+import { financeAndGeneralIcons, type AvailableIconItem, iconMap } from "@/lib/icon-map";
 import { RESERVED_CATEGORY_IDS } from "@/lib/constants";
-import { Palette } from "lucide-react"; 
+import { Palette, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CategoryIcon } from "@/components/expenses/category-icon";
 
@@ -40,7 +40,7 @@ const categoryFormSchema = z.object({
   parentId: z.string().optional(),
   icon: z.string().min(1, "Por favor selecciona un icono."),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Por favor introduce un color hexadecimal válido (ej. #RRGGBB).")
-    .or(z.string().length(0).transform(val => val === "" ? undefined : val).optional()), 
+    .or(z.string().length(0).transform(val => val === "" ? undefined : val).optional()),
 });
 
 type CategoryFormValues = z.infer<typeof categoryFormSchema>;
@@ -54,11 +54,10 @@ interface CategoryFormProps {
 export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFormProps) {
   const { addCategory, updateCategory, getParentCategories: getAllParentCategories, getCategoryById } = useAppData();
   const { toast } = useToast();
+  const [iconSearchTerm, setIconSearchTerm] = useState("");
 
   const parentCategoryOptions = getAllParentCategories().filter(pc => {
-    // La categoría no puede ser su propio padre.
     if (categoryToEdit && categoryToEdit.id === pc.id) return false;
-    // 'uncategorized' y 'other' no pueden ser padres de otras categorías.
     if (pc.id === 'uncategorized' || pc.id === 'other') return false;
     return true;
   });
@@ -76,11 +75,11 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
       : {
           name: "",
           parentId: NO_PARENT_VALUE,
-          icon: "Shapes", 
-          color: "", 
+          icon: "Shapes",
+          color: "",
         },
   });
-  
+
   const isReservedForParenting = categoryToEdit && (RESERVED_CATEGORY_IDS.includes(categoryToEdit.id) && categoryToEdit.id !== 'income');
   const watchedColor = form.watch("color");
   const watchedIcon = form.watch("icon");
@@ -105,10 +104,10 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
 
   async function onSubmit(data: CategoryFormValues) {
     const finalParentId = data.parentId === NO_PARENT_VALUE ? undefined : data.parentId;
-    
+
     if (categoryToEdit && RESERVED_CATEGORY_IDS.includes(categoryToEdit.id) && categoryToEdit.id !== 'income' && finalParentId) {
         toast({ variant: "destructive", title: "Acción no permitida", description: `La categoría reservada "${categoryToEdit.name}" no puede ser una subcategoría.`});
-        form.setValue("parentId", NO_PARENT_VALUE); 
+        form.setValue("parentId", NO_PARENT_VALUE);
         return;
     }
     if (categoryToEdit && finalParentId === categoryToEdit.id) {
@@ -125,12 +124,11 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
 
     if (categoryToEdit) {
       if (RESERVED_CATEGORY_IDS.includes(categoryToEdit.id) && categoryToEdit.id !== 'income') {
-        // Si es una categoría reservada (excepto income), no se permite cambiar parentId
         const reservedSafeData = {
             name: data.name,
             icon: data.icon,
             color: data.color || null,
-            parentId: categoryToEdit.parentId, // Mantiene el parentId original
+            parentId: categoryToEdit.parentId,
         }
         await updateCategory({ ...reservedSafeData, id: categoryToEdit.id });
         toast({ title: `Categoría "${categoryToEdit.name}" Actualizada`, description: `Sus detalles (excepto ser subcategoría) han sido actualizados.` });
@@ -142,10 +140,17 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
       await addCategory(categoryData);
       toast({ title: "Categoría Añadida", description: `"${data.name}" ha sido añadida.` });
     }
-    
+
     onSave();
     dialogClose?.();
   }
+
+  const filteredIcons = useMemo(() => {
+    if (!iconSearchTerm) return financeAndGeneralIcons;
+    return financeAndGeneralIcons.filter(iconItem =>
+      iconItem.name.toLowerCase().includes(iconSearchTerm.toLowerCase())
+    );
+  }, [iconSearchTerm]);
 
   return (
     <Form {...form}>
@@ -164,7 +169,6 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
           )}
         />
 
-        {/* Permitir seleccionar padre a menos que estés editando 'uncategorized' o 'other' */}
         {!(categoryToEdit && (categoryToEdit.id === 'uncategorized' || categoryToEdit.id === 'other')) && (
           <FormField
             control={form.control}
@@ -172,9 +176,9 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Categoría Principal (Opcional)</FormLabel>
-                <Select 
-                  onValueChange={field.onChange} 
-                  value={field.value} 
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value}
                   defaultValue={field.value}
                   disabled={isReservedForParenting}
                 >
@@ -198,7 +202,7 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
             )}
           />
         )}
-        
+
         <FormField
           control={form.control}
           name="icon"
@@ -209,11 +213,24 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
                 <span>Seleccionado:</span>
                 <CategoryIcon iconName={watchedIcon} color={watchedColor} size={6} />
               </div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    type="text"
+                    placeholder="Buscar icono..."
+                    value={iconSearchTerm}
+                    onChange={(e) => setIconSearchTerm(e.target.value)}
+                    className="mb-2 pl-8"
+                />
+              </div>
               <FormControl>
                 <ScrollArea className="h-[200px] w-full rounded-md border p-2 bg-background">
+                  {filteredIcons.length === 0 && (
+                    <p className="text-center text-muted-foreground py-4">No se encontraron iconos.</p>
+                  )}
                   <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
-                    {availableIcons.map((iconItem: AvailableIconItem) => {
-                      const IconComp = iconMap[iconItem.name] || Palette;
+                    {filteredIcons.map((iconItem: AvailableIconItem) => {
+                      const IconComp = iconItem.component || Palette;
                       const isSelected = field.value === iconItem.name;
                       return (
                         <Button
@@ -223,10 +240,11 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
                           type="button"
                           onClick={() => field.onChange(iconItem.name)}
                           className={cn(
-                            "p-2 flex justify-center items-center h-10 w-10", 
+                            "p-2 flex justify-center items-center h-10 w-10",
                             isSelected && "ring-2 ring-ring ring-offset-2"
                           )}
                           aria-label={iconItem.name}
+                          title={iconItem.name}
                         >
                           <IconComp className="h-5 w-5" />
                         </Button>
@@ -239,7 +257,7 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="color"
@@ -248,17 +266,17 @@ export function CategoryForm({ categoryToEdit, onSave, dialogClose }: CategoryFo
               <FormLabel>Color (Opcional)</FormLabel>
               <div className="flex items-center gap-2">
                 <FormControl>
-                  <Input 
-                    type="color" 
-                    {...field} 
-                    className="p-1 h-10 w-16" 
-                    value={field.value || '#000000'} 
-                    onChange={(e) => field.onChange(e.target.value === '#000000' && !categoryToEdit?.color ? '' : e.target.value)} 
+                  <Input
+                    type="color"
+                    {...field}
+                    className="p-1 h-10 w-16"
+                    value={field.value || '#000000'}
+                    onChange={(e) => field.onChange(e.target.value === '#000000' && !categoryToEdit?.color ? '' : e.target.value)}
                   />
                 </FormControl>
-                <Input 
-                    type="text" 
-                    placeholder="#RRGGBB" 
+                <Input
+                    type="text"
+                    placeholder="#RRGGBB"
                     value={field.value || ''}
                     onChange={(e) => field.onChange(e.target.value)}
                     className="max-w-[120px]"

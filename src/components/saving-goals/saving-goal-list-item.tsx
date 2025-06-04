@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { CategoryIcon } from '@/components/expenses/category-icon';
 import { cn, formatDate } from '@/lib/utils';
-import { Pencil, Trash2, MoreVertical, CheckCircle, Clock, TrendingDown, PackageOpen, Banknote } from 'lucide-react';
+import { Pencil, Trash2, MoreVertical, CheckCircle, Clock, TrendingDown, TrendingUp, PackageOpen, Banknote, Wallet } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,10 +30,22 @@ export function SavingGoalListItem({ goal, onEdit, onDelete }: SavingGoalListIte
   const savingsProgressPercentage = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : (goal.currentAmount > 0 ? 100 : 0);
   const isCompleted = goal.status === 'completed';
 
-  const linkedExpenses = getTransactionsForSavingGoal(goal.id).filter(t => t.type === 'expense');
-  const totalSpentOnPlan = linkedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const linkedTransactions = getTransactionsForSavingGoal(goal.id);
+  const totalContributions = linkedTransactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
   
-  const budgetRemaining = goal.targetAmount - totalSpentOnPlan;
+  // Ensure goal.currentAmount reflects total contributions if not already handled by context
+  // For this component, we'll assume goal.currentAmount is the "total saved/contributed"
+  // If the data model changes such that goal.currentAmount becomes a net balance, this might need adjustment.
+  // For now, we will stick to goal.currentAmount being total accumulated via income transactions.
+
+  const totalSpentOnPlan = linkedTransactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, expense) => sum + expense.amount, 0);
+  
+  const currentGoalBalance = goal.currentAmount - totalSpentOnPlan;
+  
   const spendingProgressPercentage = goal.targetAmount > 0 ? (totalSpentOnPlan / goal.targetAmount) * 100 : (totalSpentOnPlan > 0 ? 100 : 0);
 
 
@@ -81,8 +93,12 @@ export function SavingGoalListItem({ goal, onEdit, onDelete }: SavingGoalListIte
         </div>
       </CardHeader>
       <CardContent className="pt-2 flex-grow space-y-3">
+        {/* Section 1: Savings Progress */}
         <div>
-          <div className="text-xs font-medium text-muted-foreground mb-0.5">Progreso de Ahorro:</div>
+          <div className="text-xs font-medium text-muted-foreground mb-0.5 flex items-center">
+            <TrendingUp className="inline h-3.5 w-3.5 mr-1.5 text-green-500" />
+            Progreso de Ahorro:
+          </div>
           <div className="text-sm text-muted-foreground">
             <span className="font-semibold text-primary">{formatUserCurrency(goal.currentAmount)}</span> / {formatUserCurrency(goal.targetAmount)}
           </div>
@@ -92,25 +108,47 @@ export function SavingGoalListItem({ goal, onEdit, onDelete }: SavingGoalListIte
         
         <Separator />
 
+        {/* Section 2: Spending from Goal's Budget */}
         <div>
-            <div className="text-xs font-medium text-muted-foreground mb-0.5">Presupuesto del Plan:</div>
+            <div className="text-xs font-medium text-muted-foreground mb-0.5 flex items-center">
+                <PackageOpen className="inline h-3.5 w-3.5 mr-1.5 text-red-500" />
+                Gasto del Presupuesto del Objetivo:
+            </div>
             <div className="flex justify-between items-baseline text-sm mb-1">
-                <span className="font-semibold text-accent-foreground">{formatUserCurrency(goal.targetAmount)}</span>
-                {totalSpentOnPlan > goal.targetAmount && (
-                    <Badge variant="destructive" className="text-xs">Excedido</Badge>
-                )}
+                <span className="text-muted-foreground">Gastado: <span className="font-semibold text-destructive">{formatUserCurrency(totalSpentOnPlan)}</span></span>
+                <span className="text-muted-foreground">Presupuesto: <span className="font-semibold">{formatUserCurrency(goal.targetAmount)}</span></span>
             </div>
+             {goal.targetAmount > 0 && (
+                <>
+                <Progress 
+                    value={Math.min(spendingProgressPercentage, 100)} 
+                    aria-label={`${goal.name} progreso del gasto del plan`} 
+                    className={cn("h-2 mt-1", spendingProgressPercentage > 100 && "bg-red-200 [&>div]:bg-red-500")}
+                />
+                <p className="text-xs text-muted-foreground text-right mt-0.5">
+                    {Math.min(spendingProgressPercentage, 100).toFixed(0)}% gastado del presupuesto del objetivo
+                </p>
+                </>
+            )}
+             {totalSpentOnPlan > goal.targetAmount && (
+                <Badge variant="destructive" className="text-xs mt-1">Excedido</Badge>
+            )}
+        </div>
 
-            <div className="flex justify-between text-xs text-muted-foreground">
-                <span><TrendingDown className="inline h-3 w-3 mr-1 text-red-500" />Gastado: {formatUserCurrency(totalSpentOnPlan)}</span>
-                <span><PackageOpen className="inline h-3 w-3 mr-1 text-blue-500" />Restante: {formatUserCurrency(budgetRemaining)}</span>
-            </div>
-            <Progress 
-                value={Math.min(spendingProgressPercentage, 100)} 
-                aria-label={`${goal.name} progreso del gasto del plan`} 
-                className={cn("h-2 mt-1", spendingProgressPercentage > 100 && "bg-red-200 [&>div]:bg-red-500")}
-            />
-            <p className="text-xs text-muted-foreground text-right mt-0.5">{Math.min(spendingProgressPercentage, 100).toFixed(0)}% gastado</p>
+        <Separator />
+
+        {/* Section 3: Current Goal Balance */}
+        <div>
+          <div className="text-xs font-medium text-muted-foreground mb-0.5 flex items-center">
+            <Wallet className="inline h-4 w-4 mr-1.5 text-blue-500" />
+            Saldo Actual del Objetivo:
+          </div>
+          <div className={cn("text-xl font-bold", currentGoalBalance >= 0 ? "text-blue-600" : "text-destructive")}>
+            {formatUserCurrency(currentGoalBalance)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            (Total ahorrado para este objetivo menos lo gastado en él)
+          </p>
         </div>
 
       </CardContent>
@@ -123,3 +161,5 @@ export function SavingGoalListItem({ goal, onEdit, onDelete }: SavingGoalListIte
     </Card>
   );
 }
+
+    

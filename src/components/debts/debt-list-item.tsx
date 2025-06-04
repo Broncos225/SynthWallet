@@ -5,9 +5,9 @@ import type { Debt } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { formatDate } from '@/lib/utils'; // formatUserCurrency will come from context
+import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { HandCoins, FileText, Trash2, MoreVertical } from 'lucide-react';
+import { HandCoins, FileText, Trash2, MoreVertical, Edit3 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,23 +20,26 @@ interface DebtListItemProps {
   debt: Debt;
   onRegisterPayment: (debt: Debt) => void;
   onViewTransactions: (debt: Debt) => void;
-  onDelete: (debtId: string) => void;
+  onDelete: (debt: Debt) => void;
+  onEdit: (debt: Debt) => void;
 }
 
-export function DebtListItem({ debt, onRegisterPayment, onViewTransactions, onDelete }: DebtListItemProps) {
-  const { formatUserCurrency } = useAppData();
+export function DebtListItem({ debt, onRegisterPayment, onViewTransactions, onDelete, onEdit }: DebtListItemProps) {
+  const { formatUserCurrency, getPayeeName } = useAppData();
   const progressPercentage = debt.initialAmount > 0 ? ((debt.initialAmount - debt.currentBalance) / debt.initialAmount) * 100 : (debt.currentBalance === 0 ? 100 : 0);
   const isPaid = debt.status === 'pagada';
 
+  const debtorCreditorName = debt.payeeId ? getPayeeName(debt.payeeId) : debt.debtorOrCreditor;
+
   const getStatusBadgeVariant = (status: Debt['status']) => {
     switch (status) {
-      case 'pagada': return 'default'; 
+      case 'pagada': return 'default';
       case 'parcial': return 'secondary';
       case 'pendiente': return 'outline';
       default: return 'outline';
     }
   };
-  
+
   const getStatusBadgeText = (status: Debt['status']) => {
     switch (status) {
       case 'pagada': return 'Pagada/Cobrada';
@@ -53,7 +56,7 @@ export function DebtListItem({ debt, onRegisterPayment, onViewTransactions, onDe
           <div>
             <CardTitle className="text-lg font-semibold mb-1">{debt.name}</CardTitle>
             <CardDescription>
-              {debt.type === 'owed_by_me' ? 'Debes a: ' : 'Te debe: '} <strong>{debt.debtorOrCreditor}</strong>
+              {debt.type === 'owed_by_me' ? 'Debes a: ' : 'Te debe: '} <strong>{debtorCreditorName}</strong>
             </CardDescription>
           </div>
            <DropdownMenu>
@@ -64,6 +67,9 @@ export function DebtListItem({ debt, onRegisterPayment, onViewTransactions, onDe
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(debt)}>
+                <Edit3 className="mr-2 h-4 w-4" /> Editar Deuda
+              </DropdownMenuItem>
               {!isPaid && (
                 <DropdownMenuItem onClick={() => onRegisterPayment(debt)}>
                   <HandCoins className="mr-2 h-4 w-4" /> Registrar Abono
@@ -72,7 +78,7 @@ export function DebtListItem({ debt, onRegisterPayment, onViewTransactions, onDe
               <DropdownMenuItem onClick={() => onViewTransactions(debt)}>
                 <FileText className="mr-2 h-4 w-4" /> Ver Transacciones
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(debt.id)} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={() => onDelete(debt)} className="text-destructive focus:text-destructive">
                 <Trash2 className="mr-2 h-4 w-4" /> Eliminar Deuda
               </DropdownMenuItem>
             </DropdownMenuContent>

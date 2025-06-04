@@ -5,17 +5,19 @@ export type TransactionType = 'expense' | 'income' | 'transfer';
 
 export type Transaction = {
   id: string;
-  accountId: string | null; // Can be null for transfers before specific account assignment
+  accountId: string | null;
   type: TransactionType;
   description: string;
   amount: number;
   date: string; // ISO string
   categoryId?: string | null;
-  payee?: string | null;
+  payeeId?: string | null; // Changed from payee: string
   fromAccountId?: string | null;
   toAccountId?: string | null;
   relatedDebtTransactionId?: string | null;
   savingGoalId?: string | null;
+  imageUrl?: string | null;
+  notes?: string | null;
 };
 
 export type Category = {
@@ -23,7 +25,7 @@ export type Category = {
   name: string;
   icon: string;
   color?: string | null;
-  parentId?: string | null; 
+  parentId?: string | null;
 };
 
 export type Budget = {
@@ -46,13 +48,13 @@ export type ChartDataPoint = {
   id?: string;
 };
 
-export type ExpenseTemplate = {
+export type ExpenseTemplate = { // This might be better named TransactionTemplate
   id: string;
   name: string;
   description?: string;
   amount: number;
   categoryId: string;
-  payee?: string;
+  payeeId?: string | null; // Changed from payee: string
   accountId?: string;
 };
 
@@ -70,7 +72,8 @@ export type Debt = {
   id: string;
   name: string;
   type: 'owed_by_me' | 'owed_to_me';
-  debtorOrCreditor: string;
+  debtorOrCreditor: string; // Maintained for display of old data / fallback
+  payeeId: string | null; // New field for Payee reference
   initialAmount: number;
   currentBalance: number;
   dueDate?: string | null;
@@ -115,11 +118,11 @@ export type RecurringTransactionFrequency = 'daily' | 'weekly' | 'bi-weekly' | '
 export type RecurringTransaction = {
   id: string;
   name: string;
-  type: 'expense' | 'income';
+  type: 'expense' | 'income'; // Transfers not typically recurring this way, but could be added
   amount: number;
-  categoryId: string | null;
-  accountId: string | null;
-  payee: string | null;
+  categoryId: string | null; // Required for expense/income
+  accountId: string | null; // Required for expense/income
+  payeeId: string | null; // Changed from payee: string
   frequency: RecurringTransactionFrequency;
   startDate: string; // ISO date string (yyyy-MM-dd)
   endDate: string | null; // ISO date string (yyyy-MM-dd)
@@ -127,4 +130,9 @@ export type RecurringTransaction = {
   isActive: boolean;
   nextDueDate: string | null; // ISO date string (yyyy-MM-dd)
   lastProcessedDate: string | null; // ISO date string (yyyy-MM-dd)
+};
+
+export type Payee = {
+  id: string;
+  name: string;
 };

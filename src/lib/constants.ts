@@ -20,6 +20,8 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'gifts_donations', name: 'Regalos/Donaciones', icon: 'Gift', color: 'hsl(var(--chart-11))' },
   { id: 'investments_savings', name: 'Inversiones/Ahorros', icon: 'TrendingUp', color: 'hsl(var(--chart-12))' },
   { id: 'income', name: 'Ingresos', icon: 'DollarSign', color: 'hsl(var(--chart-4))' }, 
+  { id: 'debt_payments', name: 'Pagos de Deudas', icon: 'ArrowDownCircle', color: 'hsl(var(--chart-10))', parentId: null },
+  { id: 'debt_collections', name: 'Cobros de Deudas', icon: 'ArrowUpCircle', color: 'hsl(var(--chart-11))', parentId: null },
 
   // Subcategories
   { id: 'food_restaurants', name: 'Restaurantes', icon: 'Pizza', parentId: 'food', color: 'hsl(var(--chart-1))' },
@@ -46,7 +48,7 @@ export const INITIAL_CATEGORIES: Category[] = [
 ];
 
 export const DEFAULT_CATEGORY_ID = 'uncategorized';
-export const RESERVED_CATEGORY_IDS = ['uncategorized', 'other', 'income'];
+export const RESERVED_CATEGORY_IDS = ['uncategorized', 'other', 'income', 'debt_payments', 'debt_collections'];
 
 export const DEFAULT_ACCOUNT_ID = 'default_cash_account';
 export const INITIAL_ACCOUNTS: Account[] = [

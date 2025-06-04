@@ -7,14 +7,14 @@ import { SpendingPieChart } from '@/components/reports/spending-pie-chart';
 import { BudgetListItem } from '@/components/budgets/budget-list-item';
 import { TransactionTable } from '@/components/transactions/transaction-table';
 import { useAppData } from '@/contexts/app-data-context';
-import type { Transaction, Budget, Account } from '@/types';
-import { getMonthYear, formatDate } from '@/lib/utils';
-import { DollarSign, ListChecks, AlertTriangle, Wallet, Info, TrendingDown, TrendingUp, ArrowRightLeft, X as CloseIcon, Download } from 'lucide-react';
+import type { Transaction, Budget, Account, Category, TransactionType, RecurringTransaction } from '@/types';
+import { getMonthYear, formatDate, normalizeString } from '@/lib/utils'; // Added normalizeString
+import { DollarSign, ListChecks, AlertTriangle, Wallet, Info, TrendingDown, TrendingUp, ArrowRightLeft, X as CloseIcon, Download, Repeat, CalendarClock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format, startOfMonth, parseISO, isValid as dateFnsIsValid } from 'date-fns';
+import { format, startOfMonth, parseISO, isValid as dateFnsIsValid, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -33,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { TransactionForm } from '@/components/transactions/transaction-form'; // Import added
+import { TransactionForm } from '@/components/transactions/transaction-form';
 import { BudgetForm } from '@/components/budgets/budget-form';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,7 +41,21 @@ import { CategoryIcon } from '@/components/expenses/category-icon';
 import { cn } from '@/lib/utils';
 import { exportTransactionsToCSV } from '@/lib/csv-utils';
 import { TransactionFAB } from '@/components/shared/transaction-fab';
+import { TransactionFilters, type FilterState } from '@/components/transactions/transaction-filters';
+import { DEFAULT_CATEGORY_ID } from '@/lib/constants';
+import { TransactionDetailDialog } from '@/components/transactions/transaction-detail-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
+
+const initialFilterState: FilterState = {
+  startDate: null,
+  endDate: null,
+  type: 'all',
+  categoryId: 'all',
+  accountId: 'all',
+  description: '',
+};
 
 export default function DashboardPage() {
   const {
@@ -57,7 +71,8 @@ export default function DashboardPage() {
     dataLoading,
     user,
     formatUserCurrency,
-    // transactionToPrefillFromRecurring and setTransactionToPrefillFromRecurring are used by TransactionFAB
+    getParentCategories,
+    recurringTransactions,
   } = useAppData();
 
   const { toast } = useToast();
@@ -66,7 +81,6 @@ export default function DashboardPage() {
   const safeTransactions = Array.isArray(allTransactions) ? allTransactions : [];
   const sortedAccounts = [...accounts].sort((a,b) => a.name.localeCompare(b.name));
 
-  // State for editing/deleting transactions (TransactionFAB handles new transactions)
   const [transactionToEditForPage, setTransactionToEditForPage] = useState<Transaction | undefined>(undefined);
   const [isEditTransactionFormOpen, setIsEditTransactionFormOpen] = useState(false);
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | undefined>(undefined);
@@ -74,6 +88,12 @@ export default function DashboardPage() {
   const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(false);
   const [budgetToEdit, setBudgetToEdit] = useState<Budget | undefined>(undefined);
   const [budgetToDeleteId, setBudgetToDeleteId] = useState<string | undefined>(undefined);
+
+  const [filterValues, setFilterValues] = useState<FilterState>(initialFilterState);
+  const [appliedFilters, setAppliedFilters] = useState<FilterState>(initialFilterState);
+
+  const [transactionToView, setTransactionToView] = useState<Transaction | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   const currentMonthTransactions = safeTransactions.filter(t => getMonthYear(t.date) === currentMonthYYYYMM);
   const currentMonthExpenses = currentMonthTransactions.filter(t => t.type === 'expense');
@@ -97,10 +117,10 @@ export default function DashboardPage() {
       .filter(e => {
          const expenseCategory = getCategoryById(e.categoryId);
          const budgetCategory = getCategoryById(budget.categoryId);
-         if (budgetCategory && !budgetCategory.parentId) { // Es una categoría padre
+         if (budgetCategory && !budgetCategory.parentId) {
            return (e.categoryId === budget.categoryId || expenseCategory?.parentId === budget.categoryId);
          }
-         return e.categoryId === budget.categoryId; // Es una subcategoría o una categoría sin hijos
+         return e.categoryId === budget.categoryId;
       })
       .reduce((sum, e) => sum + e.amount, 0);
     return spent > budget.amount;
@@ -125,7 +145,32 @@ export default function DashboardPage() {
   const userNamePart = user?.email?.split('@')[0] || 'Usuario';
   const capitalizedUserName = userNamePart.charAt(0).toUpperCase() + userNamePart.slice(1);
 
-  // useEffect for transactionToPrefillFromRecurring is now in TransactionFAB
+  const upcomingRecurring = useMemo(() => {
+    if (dataLoading || !Array.isArray(recurringTransactions)) return [];
+    const today = startOfDay(new Date()); // Use start of today for consistent comparison
+    const next14DaysEnd = addDays(today, 14);
+
+    return recurringTransactions
+      .filter(rt => {
+        if (!rt.isActive || !rt.nextDueDate) return false;
+        try {
+          const nextDueDate = parseISO(rt.nextDueDate);
+          return dateFnsIsValid(nextDueDate) && isWithinInterval(nextDueDate, { start: today, end: next14DaysEnd });
+        } catch (e) {
+          return false;
+        }
+      })
+      .sort((a, b) => parseISO(a.nextDueDate!).getTime() - parseISO(b.nextDueDate!).getTime())
+      .slice(0, 5); // Show top 5
+  }, [recurringTransactions, dataLoading]);
+
+  const frequencyMap: Record<RecurringTransaction['frequency'], string> = {
+    daily: 'Diario',
+    weekly: 'Semanal',
+    'bi-weekly': 'Quincenal',
+    monthly: 'Mensual',
+    yearly: 'Anual',
+  };
 
   const handleEditTransaction = (transaction: Transaction) => {
     setTransactionToEditForPage(transaction);
@@ -169,6 +214,71 @@ export default function DashboardPage() {
     setBudgetToEdit(undefined);
   };
 
+  const handleApplyFilters = () => {
+    setAppliedFilters(filterValues);
+  };
+
+  const handleResetFilters = () => {
+    setFilterValues(initialFilterState);
+    setAppliedFilters(initialFilterState);
+  };
+
+  const parentCategoriesForFilter = getParentCategories();
+
+  const filteredTransactions = useMemo(() => {
+    if (dataLoading) return []; 
+    return allTransactions.filter(transaction => {
+      let transactionDate;
+      try {
+        transactionDate = parseISO(transaction.date);
+        if (!dateFnsIsValid(transactionDate)) return false;
+      } catch (e) { return false; }
+      
+      if (appliedFilters.startDate && transactionDate < appliedFilters.startDate) return false;
+      if (appliedFilters.endDate && transactionDate > new Date(appliedFilters.endDate.setHours(23, 59, 59, 999))) return false;
+      if (appliedFilters.type !== 'all' && transaction.type !== appliedFilters.type) return false;
+      
+      if (appliedFilters.accountId !== 'all') {
+        if (transaction.type === 'transfer') {
+          if (transaction.fromAccountId !== appliedFilters.accountId && transaction.toAccountId !== appliedFilters.accountId) return false;
+        } else {
+          if (transaction.accountId !== appliedFilters.accountId) return false;
+        }
+      }
+      
+      if (appliedFilters.categoryId !== 'all') {
+        if (transaction.type === 'transfer') return false; 
+        if (appliedFilters.categoryId === DEFAULT_CATEGORY_ID) {
+            if (transaction.categoryId && transaction.categoryId !== DEFAULT_CATEGORY_ID) return false;
+        } else {
+            const category = transaction.categoryId ? getCategoryById(transaction.categoryId) : null;
+            if (!category || (category.id !== appliedFilters.categoryId && category.parentId !== appliedFilters.categoryId)) {
+              return false;
+            }
+        }
+      }
+      
+      if (appliedFilters.description) {
+        const normalizedTransactionDesc = normalizeString(transaction.description);
+        const normalizedFilterDesc = normalizeString(appliedFilters.description);
+        if (!normalizedTransactionDesc.includes(normalizedFilterDesc)) return false;
+      }
+      
+      return true;
+    });
+  }, [allTransactions, appliedFilters, dataLoading, getCategoryById]);
+
+  const handleViewDetails = (transaction: Transaction) => {
+    setTransactionToView(transaction);
+    setIsDetailDialogOpen(true);
+  };
+
+  const handleCloseDetailDialog = () => {
+    setIsDetailDialogOpen(false);
+    setTransactionToView(null);
+  };
+
+
   if (dataLoading) {
     return (
       <div className="space-y-6">
@@ -189,11 +299,13 @@ export default function DashboardPage() {
             <Skeleton className="h-[400px] w-full" />
           </div>
           <div className="md:col-span-2">
-            <Skeleton className="h-[400px] w-full" />
+             <Skeleton className="h-[400px] w-full" /> {/* Budget Summary */}
+             <Skeleton className="h-[300px] w-full mt-6" /> {/* Upcoming Recurring */}
           </div>
         </div>
-        <div>
-            <Skeleton className="h-[300px] w-full" />
+        <div className="space-y-6">
+            <Skeleton className="h-[200px] w-full" /> 
+            <Skeleton className="h-[300px] w-full" /> 
         </div>
       </div>
     );
@@ -258,8 +370,8 @@ export default function DashboardPage() {
         <div className="md:col-span-3">
            <SpendingPieChart transactions={currentMonthExpenses} title="Desglose de Gastos Mensuales (Categorías Principales)"/>
         </div>
-        <div className="md:col-span-2">
-          <Card className="shadow-lg h-full">
+        <div className="md:col-span-2 space-y-6">
+          <Card className="shadow-lg"> {/* Budget Summary Card - removed h-full */}
             <CardHeader>
               <CardTitle>Resumen de Presupuesto</CardTitle>
               <CardDescription>Estado de tus presupuestos para este mes.</CardDescription>
@@ -284,21 +396,79 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
+          
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Repeat className="mr-2 h-5 w-5 text-primary" />
+                Próximos Recordatorios (14 días)
+              </CardTitle>
+              <CardDescription>Tus próximos ingresos y gastos recurrentes programados.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {upcomingRecurring.length > 0 ? (
+                <ScrollArea className="max-h-[250px] pr-3">
+                  <ul className="space-y-3">
+                    {upcomingRecurring.map((record, index) => {
+                      const categoryName = record.categoryId ? getCategoryName(record.categoryId) : 'N/A';
+                      const Icon = record.type === 'income' ? TrendingUp : TrendingDown;
+                      const iconColor = record.type === 'income' ? 'text-green-500' : 'text-red-500';
+                      return (
+                        <li key={record.id} className="text-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex-grow min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <Icon className={`h-4 w-4 ${iconColor} flex-shrink-0`} />
+                                <span className="font-medium truncate" title={record.name}>{record.name}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground ml-6 truncate" title={categoryName}>
+                                {categoryName} - <Badge variant="outline" className="py-0 px-1.5 text-xs">{frequencyMap[record.frequency]}</Badge>
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                                <p className={`font-semibold ${iconColor}`}>{formatUserCurrency(record.amount)}</p>
+                                {record.nextDueDate && <p className="text-xs text-muted-foreground">{formatDate(record.nextDueDate, 'dd MMM')}</p>}
+                            </div>
+                          </div>
+                          {index < upcomingRecurring.length - 1 && <Separator className="my-2"/>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </ScrollArea>
+              ) : (
+                <div className="flex items-center justify-center min-h-[80px]">
+                  <p className="text-muted-foreground text-center py-4">
+                    No hay recordatorios próximos en los siguientes 14 días.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <div>
+      {/* Filters and Transaction Table Section with explicit margin-top */}
+      <div className="mt-6 space-y-6"> 
+        <TransactionFilters
+          filterValues={filterValues}
+          setFilterValues={setFilterValues}
+          accounts={accounts}
+          categories={parentCategoriesForFilter}
+          onApply={handleApplyFilters}
+          onReset={handleResetFilters}
+        />
         <TransactionTable
-          transactions={safeTransactions}
+          transactions={filteredTransactions}
           onEdit={handleEditTransaction}
           onDelete={handleDeleteTransactionConfirm}
+          onViewDetails={handleViewDetails}
           isLoading={dataLoading}
           title="Historial de Transacciones"
           itemsPerPage={10}
         />
       </div>
 
-      {/* Edit Transaction Dialog (New transactions handled by TransactionFAB) */}
       <Dialog open={isEditTransactionFormOpen} onOpenChange={(open) => {
           if (!open) handleEditTransactionDialogClose();
           else setIsEditTransactionFormOpen(true);
@@ -317,6 +487,12 @@ export default function DashboardPage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      <TransactionDetailDialog
+        transaction={transactionToView}
+        isOpen={isDetailDialogOpen}
+        onClose={handleCloseDetailDialog}
+      />
 
       <AlertDialog open={!!transactionToDeleteId} onOpenChange={() => setTransactionToDeleteId(undefined)}>
         <AlertDialogContent>
@@ -364,3 +540,9 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+        
+
+    
+
+    

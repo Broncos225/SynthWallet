@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Edit3 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,9 +34,10 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { TransactionFAB } from '@/components/shared/transaction-fab';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function DebtsPage() {
-  const { debts, deleteDebt, dataLoading, getTransactionsForDebt, accounts } = useAppData();
+  const { debts, deleteDebt, dataLoading, getTransactionsForDebt, accounts, updateDebt } = useAppData();
   const { toast } = useToast();
 
   const [isDebtFormOpen, setIsDebtFormOpen] = useState(false);
@@ -58,6 +59,11 @@ export default function DebtsPage() {
 
   const handleAddDebt = () => {
     setDebtToEdit(undefined);
+    setIsDebtFormOpen(true);
+  };
+
+  const handleEditDebt = (debt: Debt) => {
+    setDebtToEdit(debt);
     setIsDebtFormOpen(true);
   };
 
@@ -87,7 +93,6 @@ export default function DebtsPage() {
   const handleTransactionFormSave = () => {
     setIsTransactionFormOpen(false);
     setDebtForTransaction(undefined);
-    // Potentially refresh transactions list if open for this debt
     if (debtForTransactionsList && debtForTransaction && debtForTransactionsList.id === debtForTransaction.id) {
       setTransactionsListKey(prev => prev + 1);
     }
@@ -100,7 +105,7 @@ export default function DebtsPage() {
 
   const handleViewTransactions = (debt: Debt) => {
     setDebtForTransactionsList(debt);
-    setTransactionsListKey(prev => prev + 1); // Ensure list refreshes
+    setTransactionsListKey(prev => prev + 1); 
     setIsTransactionsListOpen(true);
   };
 
@@ -131,8 +136,6 @@ export default function DebtsPage() {
   };
 
   const handleTransactionDeletedInList = () => {
-    // This callback can be used to refresh data or UI if needed
-    // For example, force a re-render of the transactions list
     if (debtForTransactionsList) {
         setTransactionsListKey(prev => prev + 1);
     }
@@ -148,7 +151,7 @@ export default function DebtsPage() {
           actions={<Button disabled><PlusCircle className="mr-2 h-4 w-4" /> Añadir Nueva Deuda</Button>}
         />
         <Tabs defaultValue="pending_i_owe" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 p-1 h-auto sm:h-10">
             <TabsTrigger value="pending_i_owe" disabled>Debo (...)</TabsTrigger>
             <TabsTrigger value="pending_to_me" disabled>Me Deben (...)</TabsTrigger>
             <TabsTrigger value="paid" disabled>Pagadas/Cobradas (...)</TabsTrigger>
@@ -175,21 +178,23 @@ export default function DebtsPage() {
                         <PlusCircle className="mr-2 h-4 w-4" /> Añadir Nueva Deuda
                     </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md" aria-label="Añadir Nueva Deuda">
-                <DialogHeader>
-                    <DialogTitle>{debtToEdit ? 'Editar Deuda' : 'Añadir Nueva Deuda'}</DialogTitle>
-                    <DialogDescription>
-                    {debtToEdit ? 'Actualiza los detalles de la deuda.' : 'Introduce los detalles de la nueva deuda.'}
-                    </DialogDescription>
-                </DialogHeader>
-                <DebtForm debtToEdit={debtToEdit} onSave={handleDebtFormSave} dialogClose={handleDebtFormClose} />
+                <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col" aria-label={debtToEdit ? "Editar Deuda" : "Añadir Nueva Deuda"}>
+                  <DialogHeader>
+                      <DialogTitle>{debtToEdit ? 'Editar Deuda' : 'Añadir Nueva Deuda'}</DialogTitle>
+                      <DialogDescription>
+                      {debtToEdit ? 'Actualiza los detalles de la deuda existente.' : 'Introduce los detalles de la nueva deuda.'}
+                      </DialogDescription>
+                  </DialogHeader>
+                  <ScrollArea className="flex-grow overflow-y-auto pr-6 -mr-6">
+                    <DebtForm debtToEdit={debtToEdit} onSave={handleDebtFormSave} dialogClose={handleDebtFormClose} />
+                  </ScrollArea>
                 </DialogContent>
             </Dialog>
         }
       />
 
       <Tabs defaultValue="pending_i_owe" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3">
+        <TabsList className="grid w-full grid-cols-1 gap-1 p-1 h-auto sm:grid-cols-3 sm:h-10">
           <TabsTrigger value="pending_i_owe">Debo ({debtsIOwe.length})</TabsTrigger>
           <TabsTrigger value="pending_to_me">Me Deben ({debtsOwedToMe.length})</TabsTrigger>
           <TabsTrigger value="paid">Pagadas/Cobradas ({paidDebts.length})</TabsTrigger>
@@ -204,7 +209,8 @@ export default function DebtsPage() {
                   debt={debt}
                   onRegisterPayment={handleRegisterPayment}
                   onViewTransactions={handleViewTransactions}
-                  onDelete={() => handleDeleteRequest(debt)}
+                  onDelete={handleDeleteRequest}
+                  onEdit={handleEditDebt}
                 />
               ))}
             </div>
@@ -222,7 +228,8 @@ export default function DebtsPage() {
                   debt={debt}
                   onRegisterPayment={handleRegisterPayment}
                   onViewTransactions={handleViewTransactions}
-                  onDelete={() => handleDeleteRequest(debt)}
+                  onDelete={handleDeleteRequest}
+                  onEdit={handleEditDebt}
                 />
               ))}
             </div>
@@ -240,7 +247,8 @@ export default function DebtsPage() {
                   debt={debt}
                   onRegisterPayment={handleRegisterPayment}
                   onViewTransactions={handleViewTransactions}
-                  onDelete={() => handleDeleteRequest(debt)}
+                  onDelete={handleDeleteRequest}
+                  onEdit={handleEditDebt}
                 />
               ))}
             </div>
@@ -274,9 +282,8 @@ export default function DebtsPage() {
             <DialogHeader>
               <DialogTitle>Abonos para: {debtForTransactionsList.name}</DialogTitle>
             </DialogHeader>
-            {/* AlertDialog is managed inside DebtTransactionsList for delete confirmation */}
             <DebtTransactionsList
-                key={transactionsListKey} // Force re-render when key changes
+                key={transactionsListKey} 
                 debt={debtForTransactionsList}
                 onTransactionDeleted={handleTransactionDeletedInList}
             />
@@ -308,7 +315,6 @@ export default function DebtsPage() {
             </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-
     </div>
   );
 }

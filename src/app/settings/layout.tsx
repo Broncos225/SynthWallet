@@ -24,12 +24,12 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             key={item.href}
             variant={pathname === item.href ? "default" : "ghost"} 
             className={cn(
-              "justify-start whitespace-normal h-auto py-2 px-3 text-left",
+              "justify-start whitespace-normal h-auto py-2 px-3 text-left", // Removed w-full that was on the Link
               pathname === item.href && "bg-primary text-primary-foreground hover:bg-primary/90"
             )} 
             asChild
           >
-            <Link href={item.href} className="flex w-full items-center md:w-auto">
+            <Link href={item.href} className="flex items-center"> {/* Removed w-full and md:w-auto here */}
               <item.icon className="mr-2 h-4 w-4 flex-shrink-0" />
               <span className="flex-grow min-w-0">{item.title}</span>
             </Link>
