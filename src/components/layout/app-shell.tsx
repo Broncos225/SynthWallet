@@ -65,21 +65,9 @@ function ShellLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     setHasMounted(true);
 
-    // Intento explícito de registro del Service Worker para diagnóstico
-    if (process.env.NODE_ENV === 'production' && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('Service Worker registrado explícitamente con alcance:', registration.scope);
-        })
-        .catch((error) => {
-          console.error('Error al registrar el Service Worker explícitamente:', error);
-        });
-    }
-
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      console.log('Un Service Worker ya está controlando esta página.');
-    }
+    // next-pwa con register:true se encarga del registro del Service Worker.
+    // El registro manual se elimina para evitar conflictos y porque los problemas
+    // actuales (403/404 en manifests) impiden la activación correcta del SW.
 
   }, []);
 
