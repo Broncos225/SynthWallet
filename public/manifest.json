@@ -1,12 +1,8 @@
-
 {
   "name": "SynthWallet",
   "short_name": "SynthWallet",
   "description": "Una aplicación moderna para presupuestar y seguir gastos.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#9466FF",
+  "id": "/",
   "icons": [
     {
       "src": "/icons/icon-72.png",
@@ -42,7 +38,7 @@
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-384.png",
@@ -54,46 +50,28 @@
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "maskable"
     }
   ],
   "screenshots": [
     {
-      "src": "/screenshots/screenshot1.png",
-      "sizes": "1080x1920",
+      "src": "https://placehold.co/1280x720.png",
+      "sizes": "1280x720",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Pantalla Principal de SynthWallet"
+      "form_factor": "wide",
+      "label": "Vista de Escritorio de SynthWallet"
     },
     {
-      "src": "/screenshots/screenshot2.png",
-      "sizes": "1080x1920",
+      "src": "https://placehold.co/720x1280.png",
+      "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Registro de Transacciones"
+      "label": "Vista Móvil de SynthWallet"
     }
   ],
-  "related_applications": [],
-  "prefer_related_applications": false,
-  "orientation": "portrait-primary",
-  "scope": "/",
-  "lang": "es-ES",
-  "dir": "ltr",
-  "categories": ["finance", "utilities", "personalization"],
-  "shortcuts": [
-    {
-      "name": "Añadir Gasto",
-      "short_name": "Gasto",
-      "description": "Registrar un nuevo gasto rápidamente",
-      "url": "/?action=add_expense",
-      "icons": [{ "src": "/icons/shortcut-expense.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Añadir Ingreso",
-      "short_name": "Ingreso",
-      "description": "Registrar un nuevo ingreso rápidamente",
-      "url": "/?action=add_income",
-      "icons": [{ "src": "/icons/shortcut-income.png", "sizes": "96x96" }]
-    }
-  ]
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#9466FF",
+  "orientation": "portrait-primary"
 }
