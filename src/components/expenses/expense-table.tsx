@@ -21,7 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+// import { formatCurrency, formatDate } from '@/lib/utils'; // Removed formatCurrency
+import { formatDate } from '@/lib/utils';
 import { CategoryIcon } from './category-icon';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -35,7 +36,7 @@ interface ExpenseTableProps {
 }
 
 export function ExpenseTable({ expenses, maxItems, onEdit, onDelete, isLoading }: ExpenseTableProps) {
-  const { getCategoryById, getCategoryName, getAccountById } = useAppData(); // Assuming getAccountById might be needed if expenses are transactions
+  const { getCategoryById, getCategoryName, getAccountById, formatUserCurrency } = useAppData(); // Added formatUserCurrency
 
   // Safely handle the expenses prop
   const safeExpenses = Array.isArray(expenses) ? expenses : [];
@@ -116,7 +117,7 @@ export function ExpenseTable({ expenses, maxItems, onEdit, onDelete, isLoading }
                       // @ts-ignore - type might not be on Expense type
                       expense.type === 'income' ? 'text-green-600' : expense.type === 'expense' ? 'text-red-600' : ''
                     )}>
-                      {formatCurrency(expense.amount)}
+                      {formatUserCurrency(expense.amount)}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{formatDate(expense.date)}</TableCell>
                     <TableCell className="hidden lg:table-cell truncate max-w-[100px] xl:max-w-[150px]" title={expense.payee}>

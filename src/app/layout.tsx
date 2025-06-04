@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   manifest: "/manifest.json", // Link to the manifest file
   // PWA specific meta tags for iOS
-  appleWebAppCapable: "yes",
+  appleWebAppCapable: "yes", // Maintained for wider iOS compatibility if needed
   appleWebAppStatusBarStyle: "default", // or "black", "black-translucent"
   appleWebAppTitle: siteConfig.name,
   // For favicon and apple touch icons, you'd typically add more <link> tags here
@@ -45,7 +45,8 @@ export default function RootLayout({
       <head>
         {/* It's common to also add theme-color meta tag for immediate effect */}
         <meta name="theme-color" content="#9466FF" />
-        {/* Add meta tags for PWA behavior on iOS */}
+        {/* Add meta tags for PWA behavior on iOS and Android */}
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content={siteConfig.name} />

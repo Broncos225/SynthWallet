@@ -28,13 +28,13 @@ import { PageHeader } from '@/components/shared/page-header';
 import { useAppData } from '@/contexts/app-data-context';
 import type { ExpenseTemplate } from '@/types';
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from '@/lib/utils';
+// import { formatCurrency } from '@/lib/utils'; // Removed formatCurrency
 import { CategoryIcon } from '@/components/expenses/category-icon';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ExpenseTemplatesSettingsPage() {
-  const { expenseTemplates, deleteExpenseTemplate, getCategoryById, getCategoryName, dataLoading } = useAppData();
+  const { expenseTemplates, deleteExpenseTemplate, getCategoryById, getCategoryName, dataLoading, formatUserCurrency } = useAppData(); // Added formatUserCurrency
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [templateToEdit, setTemplateToEdit] = useState<ExpenseTemplate | undefined>(undefined);
   const [templateToDelete, setTemplateToDelete] = useState<ExpenseTemplate | undefined>(undefined);
@@ -141,7 +141,7 @@ export default function ExpenseTemplatesSettingsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="text-xl font-bold text-primary">{formatCurrency(template.amount)}</div>
+                  <div className="text-xl font-bold text-primary">{formatUserCurrency(template.amount)}</div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     {category && <CategoryIcon iconName={category.icon} color={category.color} size={4} className="mr-2"/>}
                     {getCategoryName(template.categoryId)}

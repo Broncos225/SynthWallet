@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, CreditCard, Target, BarChartHorizontalBig, Settings, Star, Tags, ReceiptText, Wallet, Goal, Repeat, UploadCloud, Palette } from "lucide-react"; // Removed VenetianMask, CustomAppIcon. Ensured Wallet is here.
+import { LayoutDashboard, CreditCard, Target, BarChartHorizontalBig, Settings, Star, Tags, ReceiptText, Wallet, Goal, Repeat, UploadCloud, Palette, Bell } from "lucide-react"; // Bell icon added
 
 export type NavItem = {
   title: string;
@@ -26,7 +26,7 @@ export type SiteConfig = {
 export const siteConfig: SiteConfig = {
   name: "SynthWallet",
   description: "Una aplicación moderna para presupuestar y seguir gastos.",
-  logo: Wallet, // Changed to Wallet icon
+  logo: Wallet,
   navItems: [
     {
       title: "Panel Principal",
@@ -80,7 +80,7 @@ export const siteConfig: SiteConfig = {
     {
       title: "Cuentas",
       href: "/settings/accounts",
-      icon: Wallet, // Wallet is already used here
+      icon: Wallet,
       description: "Administra tus cuentas bancarias, de efectivo y otras."
     },
     {
@@ -94,6 +94,12 @@ export const siteConfig: SiteConfig = {
       href: "/settings/data",
       icon: UploadCloud,
       description: "Importa o exporta tus datos de transacciones."
+    },
+    {
+      title: "Notificaciones",
+      href: "/settings/notifications",
+      icon: Bell,
+      description: "Configura y gestiona las notificaciones de la aplicación."
     }
   ]
 };

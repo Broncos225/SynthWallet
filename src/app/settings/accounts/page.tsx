@@ -29,13 +29,13 @@ import { useAppData } from '@/contexts/app-data-context';
 import type { Account } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 import { CategoryIcon } from '@/components/expenses/category-icon'; 
-import { formatCurrency } from '@/lib/utils';
+// import { formatCurrency } from '@/lib/utils'; // Removed formatCurrency
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DEFAULT_ACCOUNT_ID } from '@/lib/constants';
 
 export default function AccountsSettingsPage() {
-  const { accounts, deleteAccount, isAccountInUse, dataLoading } = useAppData();
+  const { accounts, deleteAccount, isAccountInUse, dataLoading, formatUserCurrency } = useAppData(); // Added formatUserCurrency
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [accountToEdit, setAccountToEdit] = useState<Account | undefined>(undefined);
   const [accountToDelete, setAccountToDelete] = useState<Account | undefined>(undefined);
@@ -162,11 +162,11 @@ export default function AccountsSettingsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 flex-grow">
-                    <p className="text-2xl font-semibold text-primary">{formatCurrency(account.currentBalance)}</p>
+                    <p className="text-2xl font-semibold text-primary">{formatUserCurrency(account.currentBalance)}</p>
                     <p className="text-xs text-muted-foreground">Saldo Actual</p>
                 </CardContent>
                 <CardFooter className="pt-3 border-t">
-                     <p className="text-xs text-muted-foreground">Saldo Inicial: {formatCurrency(account.initialBalance)}</p>
+                     <p className="text-xs text-muted-foreground">Saldo Inicial: {formatUserCurrency(account.initialBalance)}</p>
                 </CardFooter>
               </Card>
             );
