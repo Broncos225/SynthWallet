@@ -20,9 +20,10 @@ export const useCurrencyInput = ({ initialValue, onChangeRHF }: UseCurrencyInput
     return { locale, decimalSeparator, groupSeparator };
   }, [themeSettings?.numberFormatLocale]);
 
-  const formatNumberForDisplay = useCallback((num: number | undefined): string => {
-    if (num === undefined || isNaN(num)) return '';
+  const formatNumberForDisplay = useCallback((num: number): string => {
     const { locale } = getLocaleInfo();
+    // No formatear 0 a "0,00" aquí, ya que queremos "" para displayValue si el número es 0.
+    // Esta función solo se llamará para números distintos de cero.
     return new Intl.NumberFormat(locale, {
       style: 'decimal',
       minimumFractionDigits: 2,
@@ -30,12 +31,23 @@ export const useCurrencyInput = ({ initialValue, onChangeRHF }: UseCurrencyInput
     }).format(num);
   }, [getLocaleInfo]);
 
-  const [displayValue, setDisplayValue] = useState<string>(formatNumberForDisplay(initialValue));
+  const [displayValue, setDisplayValue] = useState<string>(() => {
+    const numericInitial = (typeof initialValue === 'number' && !isNaN(initialValue)) ? initialValue : undefined;
+    if (numericInitial === undefined || numericInitial === 0) {
+      return '';
+    }
+    return formatNumberForDisplay(numericInitial);
+  });
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     if (!isFocused) {
-      setDisplayValue(formatNumberForDisplay(initialValue));
+      const numericInitial = (typeof initialValue === 'number' && !isNaN(initialValue)) ? initialValue : undefined;
+      if (numericInitial === undefined || numericInitial === 0) {
+        setDisplayValue('');
+      } else {
+        setDisplayValue(formatNumberForDisplay(numericInitial));
+      }
     }
   }, [initialValue, isFocused, formatNumberForDisplay]);
 
@@ -43,9 +55,7 @@ export const useCurrencyInput = ({ initialValue, onChangeRHF }: UseCurrencyInput
     if (val === null || val === undefined || val.trim() === '') return undefined;
     const { decimalSeparator, groupSeparator } = getLocaleInfo();
     
-    // Remove group separators
     const cleanedVal = val.split(groupSeparator).join('');
-    // Replace locale decimal separator with a period for parseFloat
     const parsableVal = cleanedVal.replace(decimalSeparator, '.');
 
     const num = parseFloat(parsableVal);
@@ -56,54 +66,60 @@ export const useCurrencyInput = ({ initialValue, onChangeRHF }: UseCurrencyInput
     let inputValue = event.target.value;
     const { decimalSeparator } = getLocaleInfo();
 
-    // Allow only digits and one instance of the decimal separator
     let regex;
-    if (decimalSeparator === '.') {
-        regex = /[^0-9.]/g;
-    } else {
-        regex = new RegExp(`[^0-9${decimalSeparator}]`, 'g');
-    }
+    const escapedDecimalSeparator = decimalSeparator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    regex = new RegExp(`[^0-9${escapedDecimalSeparator}]`, 'g');
     
-    let sanitizedValue = inputValue.replace(regex, (match) => {
-        // Allow the first decimal separator, remove subsequent ones
-        if (match === decimalSeparator && !inputValue.slice(0, inputValue.indexOf(match)).includes(decimalSeparator)) {
+    let sanitizedValue = inputValue.replace(regex, (match, offset) => {
+        if (match === decimalSeparator && inputValue.indexOf(decimalSeparator) === offset) {
             return match;
         }
         return '';
     });
 
-    // Ensure only one decimal separator
     const parts = sanitizedValue.split(decimalSeparator);
     if (parts.length > 2) {
         sanitizedValue = parts[0] + decimalSeparator + parts.slice(1).join('');
     }
+    if (parts.length === 2 && parts[1].length > 2) {
+        sanitizedValue = parts[0] + decimalSeparator + parts[1].substring(0, 2);
+    }
     
-    setDisplayValue(sanitizedValue);
+    setDisplayValue(sanitizedValue); 
+
     const numericValue = parseInputToNumber(sanitizedValue);
     
     if (onChangeRHF) {
-      onChangeRHF(numericValue);
+      onChangeRHF(numericValue); 
     }
   }, [parseInputToNumber, onChangeRHF, getLocaleInfo]);
 
-  const handleFocus = useCallback(() => {
+  const handleFocus = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(true);
-    const numericValue = parseInputToNumber(displayValue);
-    if (numericValue !== undefined) {
-      // Show raw number (or with locale decimal) for editing
+    const numericValue = parseInputToNumber(event.target.value);
+    if (numericValue === undefined || numericValue === 0) {
+      setDisplayValue(''); 
+    } else {
       const { decimalSeparator } = getLocaleInfo();
       setDisplayValue(numericValue.toFixed(2).replace('.', decimalSeparator));
-    } else {
-      setDisplayValue('');
     }
-  }, [displayValue, parseInputToNumber, getLocaleInfo]);
+  }, [parseInputToNumber, getLocaleInfo]);
 
   const handleBlur = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
-    const numericValue = parseInputToNumber(event.target.value);
-    setDisplayValue(formatNumberForDisplay(numericValue));
-    // RHF already updated via onChange
-  }, [parseInputToNumber, formatNumberForDisplay]);
+    const numericValue = parseInputToNumber(event.target.value); 
+    if (numericValue === undefined || numericValue === 0) {
+      setDisplayValue(''); 
+      if (onChangeRHF) {
+         onChangeRHF(undefined); // Asegurar que el estado numérico se actualice a 0 o undefined
+      }
+    } else {
+      setDisplayValue(formatNumberForDisplay(numericValue));
+      if (onChangeRHF) {
+        onChangeRHF(numericValue);
+      }
+    }
+  }, [parseInputToNumber, formatNumberForDisplay, onChangeRHF, getLocaleInfo]);
   
   const getPlaceholder = () => {
     const { locale } = getLocaleInfo();
@@ -116,11 +132,11 @@ export const useCurrencyInput = ({ initialValue, onChangeRHF }: UseCurrencyInput
 
   return {
     inputProps: {
-      value: displayValue, // displayValue is always a string
+      value: displayValue,
       onChange: handleChange,
       onFocus: handleFocus,
       onBlur: handleBlur,
-      type: 'text',
+      type: 'text', 
       inputMode: 'decimal',
       autoComplete: 'off',
       placeholder: getPlaceholder(),

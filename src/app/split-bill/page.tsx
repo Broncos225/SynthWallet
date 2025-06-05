@@ -12,7 +12,6 @@ import { useCurrencyInput } from '@/hooks/use-currency-input';
 import { useAppData } from '@/contexts/app-data-context';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
   Table,
@@ -116,17 +115,17 @@ export default function SplitBillPage() {
         amountCoveredByPercentage += (p.percentageToPay! / 100) * totalBillAmount;
     }
 
-    if (totalPercentageAssigned > 100) {
-        setCalculationError(`La suma de porcentajes asignados (${totalPercentageAssigned}%) excede el 100%. Por favor, ajusta los porcentajes.`);
+    if (totalPercentageAssigned > 100.01) { // Allow small tolerance for floating point sum
+        setCalculationError(`La suma de porcentajes asignados (${totalPercentageAssigned.toFixed(2)}%) excede el 100%. Por favor, ajusta los porcentajes.`);
         return;
     }
-    if (amountCoveredByPercentage > totalBillAmount + 0.001) { // Allow for small rounding diffs
+    if (amountCoveredByPercentage > totalBillAmount + 0.01) { 
         setCalculationError(`El monto cubierto por porcentajes (${formatUserCurrency(amountCoveredByPercentage)}) excede el total del gasto (${formatUserCurrency(totalBillAmount)}). Por favor, ajusta los porcentajes.`);
         return;
     }
-    if (totalPercentageAssigned === 100 && participantsWithoutPercentage.length > 0 && (totalBillAmount - amountCoveredByPercentage > 0.01) ) {
+    if (Math.abs(totalPercentageAssigned - 100) < 0.01 && participantsWithoutPercentage.length > 0 && (totalBillAmount - amountCoveredByPercentage > 0.01) ) {
         setCalculationError("Si la suma de porcentajes es 100%, no debe haber participantes sin porcentaje asignado si aún queda monto por cubrir.");
-        // This case is tricky, might need refinement if it's a valid scenario user wants
+        return;
     }
 
 
@@ -146,10 +145,10 @@ export default function SplitBillPage() {
         let shouldPayAmount = 0;
         if (p.percentageToPay !== undefined && p.percentageToPay > 0) {
             shouldPayAmount = (p.percentageToPay / 100) * totalBillAmount;
-        } else if (numParticipantsForEqualSplit > 0 && remainingAmountToSplit > 0) { // Only assign equal share if there's something to split
+        } else if (numParticipantsForEqualSplit > 0 && remainingAmountToSplit > 0) { 
             shouldPayAmount = equalShareOfRemainder;
-        } else if (numParticipantsForEqualSplit > 0 && remainingAmountToSplit <= 0 && totalPercentageAssigned < 100) { // Percentages covered everything or more, remaining is 0 or negative
-             shouldPayAmount = 0; // Their share of remainder is 0
+        } else if (numParticipantsForEqualSplit > 0 && remainingAmountToSplit <= 0 && totalPercentageAssigned < 100) { 
+             shouldPayAmount = 0; 
         }
 
 
@@ -223,7 +222,7 @@ export default function SplitBillPage() {
             <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-primary" /> 2. Participantes</CardTitle>
              <CardDescription>Añade quiénes participaron, cuánto pagó cada uno y, opcionalmente, el % del total que deben cubrir.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex flex-col space-y-4">
             <div className="flex gap-2">
               <Input
                 type="text"
@@ -238,8 +237,8 @@ export default function SplitBillPage() {
               </Button>
             </div>
              {participants.length > 0 && (
-                <ScrollArea className={cn("max-h-[300px] pr-3 -mr-3", participants.length > 3 && "border-t pt-3 mt-3")}>
-                    <div className="space-y-3">
+                <div className="overflow-y-auto max-h-[50vh] pr-1">
+                  <div className={cn("space-y-3", participants.length > 3 && "border-t pt-3 mt-3")}>
                     {participants.map((participant, index) => (
                         <ParticipantInputRow
                         key={participant.id}
@@ -251,8 +250,8 @@ export default function SplitBillPage() {
                         index={index}
                         />
                     ))}
-                    </div>
-                </ScrollArea>
+                  </div>
+                </div>
             )}
             {participants.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Aún no hay participantes. Añade algunos para empezar.</p>
@@ -302,30 +301,32 @@ export default function SplitBillPage() {
                         Esta tabla muestra cuánto pagó cada persona, cuánto debería haber pagado y su balance.
                     </AlertDescription>
                 </Alert>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                        <TableHead>Participante</TableHead>
-                        <TableHead className="text-right">Pagó</TableHead>
-                        <TableHead className="text-right">Debería Pagar</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {costPerPersonSummary.map((summary, index) => (
-                        <TableRow key={index}>
-                            <TableCell className="font-medium">{summary.name}</TableCell>
-                            <TableCell className="text-right">{formatUserCurrency(summary.paid)}</TableCell>
-                            <TableCell className="text-right">{formatUserCurrency(summary.shouldPay)}</TableCell>
-                            <TableCell className={cn("text-right font-semibold", summary.balance < 0 ? "text-red-600" : (summary.balance > 0 ? "text-green-600" : ""))}>
-                                {formatUserCurrency(summary.balance)}
-                                {summary.balance < 0 && " (Debe)"}
-                                {summary.balance > 0 && " (Se le debe)"}
-                            </TableCell>
-                        </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Participante</TableHead>
+                            <TableHead className="text-right">Pagó</TableHead>
+                            <TableHead className="text-right">Debería Pagar</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {costPerPersonSummary.map((summary, index) => (
+                            <TableRow key={index}>
+                                <TableCell className="font-medium">{summary.name}</TableCell>
+                                <TableCell className="text-right">{formatUserCurrency(summary.paid)}</TableCell>
+                                <TableCell className="text-right">{formatUserCurrency(summary.shouldPay)}</TableCell>
+                                <TableCell className={cn("text-right font-semibold", summary.balance < 0 ? "text-red-600" : (summary.balance > 0 ? "text-green-600" : ""))}>
+                                    {formatUserCurrency(summary.balance)}
+                                    {summary.balance < -0.001 && " (Debe)"}
+                                    {summary.balance > 0.001 && " (A Favor)"}
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
               </div>
             )}
 
@@ -378,7 +379,6 @@ function ParticipantInputRow({ participant, onNameChange, onAmountChange, onPerc
         onPercentageChange(numValue);
     } else if (isNaN(numValue) && value.trim() !== "") {
         // Allow typing, but don't update state if invalid partial input (e.g. "abc")
-        // User might be in the middle of typing a valid number
     } else if (numValue < 0) {
         onPercentageChange(0);
     } else if (numValue > 100) {
@@ -388,8 +388,8 @@ function ParticipantInputRow({ participant, onNameChange, onAmountChange, onPerc
 
 
   return (
-    <div className="flex items-end gap-2 p-3 border rounded-md bg-card hover:shadow-sm">
-      <div className="flex-grow space-y-1">
+    <div className="flex flex-wrap items-end gap-2 p-3 border rounded-md bg-card hover:shadow-sm">
+      <div className="flex-grow space-y-1 min-w-[150px]">
         <Label htmlFor={`participantName-${participant.id}`} className="text-xs">Participante #{index + 1}</Label>
         <Input
           id={`participantName-${participant.id}`}
@@ -434,4 +434,5 @@ function ParticipantInputRow({ participant, onNameChange, onAmountChange, onPerc
     </div>
   );
 }
+    
 
