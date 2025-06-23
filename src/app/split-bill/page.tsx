@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Trash2, PlusCircle, Users, DivideCircle, Info, PercentIcon, Copy } from 'lucide-react';
+import { Trash2, PlusCircle, Users, DivideCircle, Info, PercentIcon, Copy, Calculator } from 'lucide-react';
 import { useCurrencyInput } from '@/hooks/use-currency-input';
 import { useAppData } from '@/contexts/app-data-context';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Participant {
   id: string;
@@ -53,10 +54,115 @@ export default function SplitBillPage() {
   const [costPerPersonSummary, setCostPerPersonSummary] = useState<IndividualContribution[]>([]);
   const [calculationError, setCalculationError] = useState<string | null>(null);
 
+  // --- Calculator State ---
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [calculatorState, setCalculatorState] = useState({
+    displayValue: '0',
+    previousValue: null as number | null,
+    operator: null as string | null,
+    waitingForOperand: false,
+  });
+
   const { inputProps: totalBillInputProps } = useCurrencyInput({
     initialValue: totalBillAmount,
     onChangeRHF: (value) => setTotalBillAmount(value),
   });
+
+  // --- Calculator Logic ---
+  const handleCalculatorInput = (input: string) => {
+    setCalculatorState(prevState => {
+      // Handle error state
+      if (prevState.displayValue === 'Error') {
+        return { ...prevState, displayValue: input, waitingForOperand: false };
+      }
+
+      if (input === '.') {
+        if (prevState.waitingForOperand) return { ...prevState, displayValue: '0.', waitingForOperand: false };
+        if (prevState.displayValue.includes('.')) return prevState;
+        return { ...prevState, displayValue: prevState.displayValue + '.' };
+      }
+
+      if (prevState.waitingForOperand) {
+        return { ...prevState, displayValue: input, waitingForOperand: false };
+      } else {
+        const newDisplayValue = prevState.displayValue === '0' ? input : prevState.displayValue + input;
+        return { ...prevState, displayValue: newDisplayValue };
+      }
+    });
+  };
+
+  const performCalculation = (prev: number, current: number, op: string): number => {
+    switch (op) {
+      case '+': return prev + current;
+      case '-': return prev - current;
+      case '*': return prev * current;
+      case '/': return current === 0 ? Infinity : prev / current; // Return Infinity for division by zero
+      default: return current;
+    }
+  };
+
+  const handleCalculatorOperation = (nextOperator: string) => {
+    setCalculatorState(prevState => {
+      const inputValue = parseFloat(prevState.displayValue);
+
+      // If there's an error, do nothing until cleared
+      if (isNaN(inputValue) || prevState.displayValue === 'Error') return prevState;
+
+      let newPreviousValue = prevState.previousValue;
+
+      if (newPreviousValue === null) {
+        newPreviousValue = inputValue;
+      } else if (prevState.operator && !prevState.waitingForOperand) {
+        const result = performCalculation(newPreviousValue, inputValue, prevState.operator);
+        if (!isFinite(result)) {
+           return { displayValue: 'Error', previousValue: null, operator: null, waitingForOperand: true };
+        }
+        newPreviousValue = result;
+      }
+
+      return {
+        displayValue: String(newPreviousValue),
+        previousValue: newPreviousValue,
+        operator: nextOperator,
+        waitingForOperand: true,
+      };
+    });
+  };
+
+  const handleCalculatorEquals = () => {
+    setCalculatorState(prevState => {
+      const { operator, previousValue, displayValue } = prevState;
+      const inputValue = parseFloat(displayValue);
+
+      if (operator && previousValue !== null) {
+        const result = performCalculation(previousValue, inputValue, operator);
+        if (!isFinite(result)) {
+          return { displayValue: 'Error', previousValue: null, operator: null, waitingForOperand: true };
+        }
+        return { displayValue: String(result), previousValue: null, operator: null, waitingForOperand: true };
+      }
+      return prevState;
+    });
+  };
+  
+  const handleCalculatorClear = () => {
+    setCalculatorState({
+      displayValue: '0',
+      previousValue: null,
+      operator: null,
+      waitingForOperand: false,
+    });
+  };
+
+  const handleCalculatorApply = () => {
+    const finalValue = parseFloat(calculatorState.displayValue);
+    if (!isNaN(finalValue) && isFinite(finalValue)) {
+      setTotalBillAmount(finalValue);
+    }
+    setIsCalculatorOpen(false);
+  };
+  // --- End Calculator Logic ---
+
 
   const addParticipant = () => {
     if (newParticipantName.trim() === '') return;
@@ -267,13 +373,53 @@ export default function SplitBillPage() {
             <CardTitle>1. Configuración del Gasto</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+             <div>
               <Label htmlFor="totalBillAmount">Monto Total del Gasto</Label>
-              <Input
-                id="totalBillAmount"
-                {...totalBillInputProps}
-                className="mt-1"
-              />
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  id="totalBillAmount"
+                  {...totalBillInputProps}
+                />
+                <Popover open={isCalculatorOpen} onOpenChange={setIsCalculatorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" aria-label="Abrir calculadora">
+                      <Calculator className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2">
+                    <div className="space-y-2">
+                      <div className="rounded-md border bg-muted p-2 text-right text-2xl font-mono h-12 flex items-center justify-end break-all">
+                        {calculatorState.displayValue}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        <Button variant="outline" className="col-span-3" onClick={handleCalculatorClear}>C</Button>
+                        <Button variant="outline" onClick={() => handleCalculatorOperation('/')}>÷</Button>
+
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('7')}>7</Button>
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('8')}>8</Button>
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('9')}>9</Button>
+                        <Button variant="outline" onClick={() => handleCalculatorOperation('*')}>×</Button>
+
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('4')}>4</Button>
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('5')}>5</Button>
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('6')}>6</Button>
+                        <Button variant="outline" onClick={() => handleCalculatorOperation('-')}>-</Button>
+                        
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('1')}>1</Button>
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('2')}>2</Button>
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('3')}>3</Button>
+                        <Button variant="outline" onClick={() => handleCalculatorOperation('+')}>+</Button>
+
+                        <Button variant="secondary" className="col-span-2" onClick={() => handleCalculatorInput('0')}>0</Button>
+                        <Button variant="secondary" onClick={() => handleCalculatorInput('.')}>.</Button>
+                        <Button variant="default" onClick={handleCalculatorEquals}>=</Button>
+
+                      </div>
+                      <Button className="w-full" onClick={handleCalculatorApply}>Aplicar al Gasto</Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </CardContent>
         </Card>
