@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Trash2, PlusCircle, Users, DivideCircle, Info, PercentIcon } from 'lucide-react';
+import { Trash2, PlusCircle, Users, DivideCircle, Info, PercentIcon, Copy } from 'lucide-react';
 import { useCurrencyInput } from '@/hooks/use-currency-input';
 import { useAppData } from '@/contexts/app-data-context';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
 
 interface Participant {
   id: string;
@@ -44,6 +45,7 @@ interface IndividualContribution {
 
 export default function SplitBillPage() {
   const { formatUserCurrency } = useAppData();
+  const { toast } = useToast();
   const [totalBillAmount, setTotalBillAmount] = useState<number | undefined>(undefined);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [newParticipantName, setNewParticipantName] = useState('');
@@ -193,6 +195,65 @@ export default function SplitBillPage() {
   const totalPaidByParticipants = participants.reduce((sum, p) => sum + p.amountPaid, 0);
   const differenceFromTotalBill = totalBillAmount !== undefined ? totalPaidByParticipants - totalBillAmount : 0;
 
+  const generateSummaryText = (): string => {
+    if (!totalBillAmount || costPerPersonSummary.length === 0) return "No hay datos para generar el resumen.";
+
+    let summary = "Resumen de División de Gastos\n";
+    summary += "=============================\n";
+    summary += `Monto Total del Gasto: ${formatUserCurrency(totalBillAmount)}\n\n`;
+
+    summary += "Participantes:\n";
+    summary += "-----------------------------\n";
+    costPerPersonSummary.forEach(item => {
+      const originalParticipant = participants.find(p => p.name === item.name);
+      summary += `- ${item.name}:\n`;
+      summary += `  Pagó: ${formatUserCurrency(item.paid)}\n`;
+      if (originalParticipant && originalParticipant.percentageToPay !== undefined && originalParticipant.percentageToPay > 0) {
+        summary += `  % A Cubrir: ${originalParticipant.percentageToPay.toFixed(2)}%\n`;
+      } else {
+        summary += `  % A Cubrir: N/A (División equitativa del resto)\n`;
+      }
+      summary += `  Debería Pagar: ${formatUserCurrency(item.shouldPay)}\n`;
+      let balanceText = `${formatUserCurrency(item.balance)}`;
+      if (item.balance < -0.001) balanceText += ` (Debe ${formatUserCurrency(Math.abs(item.balance))})`;
+      else if (item.balance > 0.001) balanceText += ` (A favor ${formatUserCurrency(item.balance)})`;
+      else balanceText += ` (Saldado)`;
+      summary += `  Balance: ${balanceText}\n`;
+      summary += "-----------------------------\n";
+    });
+
+    summary += "\nAjustes para Saldar Cuentas:\n";
+    summary += "-----------------------------\n";
+    if (settlements.length > 0) {
+      settlements.forEach(settlement => {
+        summary += `- ${settlement.from} le debe a ${settlement.to}: ${formatUserCurrency(settlement.amount)}\n`;
+      });
+    } else {
+      summary += "¡Todas las cuentas están saldadas o no se requieren pagos adicionales!\n";
+    }
+    summary += "=============================";
+    return summary;
+  };
+
+  const handleCopySummary = async () => {
+    const summaryText = generateSummaryText();
+    try {
+      await navigator.clipboard.writeText(summaryText);
+      toast({
+        title: "¡Resumen Copiado!",
+        description: "El resumen de la división de gastos ha sido copiado al portapapeles.",
+      });
+    } catch (err) {
+      console.error('Error al copiar el texto: ', err);
+      toast({
+        variant: "destructive",
+        title: "Error al Copiar",
+        description: "No se pudo copiar el resumen al portapapeles.",
+      });
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -236,8 +297,8 @@ export default function SplitBillPage() {
                 <span className="sr-only">Añadir participante</span>
               </Button>
             </div>
-             {participants.length > 0 && (
-                <div className="overflow-y-auto max-h-[50vh] pr-1">
+            <div className="overflow-y-auto max-h-[50vh] pr-1">
+              {participants.length > 0 && (
                   <div className={cn("space-y-3", participants.length > 3 && "border-t pt-3 mt-3")}>
                     {participants.map((participant, index) => (
                         <ParticipantInputRow
@@ -251,8 +312,8 @@ export default function SplitBillPage() {
                         />
                     ))}
                   </div>
-                </div>
-            )}
+              )}
+            </div>
             {participants.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Aún no hay participantes. Añade algunos para empezar.</p>
             )}
@@ -346,6 +407,14 @@ export default function SplitBillPage() {
               <p className="text-sm text-green-600 font-medium text-center py-3">¡Todas las cuentas están saldadas o no se requieren pagos adicionales entre participantes!</p>
             )}
           </CardContent>
+          {!calculationError && costPerPersonSummary.length > 0 && (
+            <CardFooter className="border-t pt-4 flex justify-end">
+                <Button onClick={handleCopySummary} variant="outline">
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copiar Resumen
+                </Button>
+            </CardFooter>
+          )}
         </Card>
       )}
     </div>
@@ -435,4 +504,3 @@ function ParticipantInputRow({ participant, onNameChange, onAmountChange, onPerc
   );
 }
     
-

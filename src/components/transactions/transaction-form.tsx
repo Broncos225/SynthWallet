@@ -29,16 +29,17 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatDate, normalizeString } from "@/lib/utils";
-import { CalendarIcon, Star, Info, UserPlus } from "lucide-react";
+import { CalendarIcon, Star, Info, UserPlus, Loader2 } from "lucide-react";
 import { useAppData } from "@/contexts/app-data-context";
 import type { Transaction, Category, ExpenseTemplate, Account, TransactionType, SavingGoal, Payee } from "@/types";
 import { useState, useEffect } from "react";
-import { DEFAULT_CATEGORY_ID, DEFAULT_ACCOUNT_ID } from "@/lib/constants";
+import { DEFAULT_CATEGORY_ID, DEFAULT_ACCOUNT_ID, RESERVED_CATEGORY_IDS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { es } from 'date-fns/locale';
 import { formatISO, parseISO, isValid } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCurrencyInput } from "@/hooks/use-currency-input";
+import { categorizeExpense } from "@/ai/flows/expenseCategorization";
 
 const NONE_SUBCATEGORY_VALUE = "_NONE_SUBCATEGORY_VALUE_";
 const NONE_TEMPLATE_VALUE = "_NONE_TEMPLATE_VALUE_";
@@ -169,14 +170,18 @@ export function TransactionForm({
     addTransaction,
     updateTransaction,
     getCategoryById,
+    getCategoryName,
     getExpenseTemplates,
     accounts,
     payees,
     addPayee,
+    getPayeeName,
     savingGoals: allSavingGoals,
     formatUserCurrency,
+    categories,
   } = useAppData();
   const { toast } = useToast();
+  const [isCategorizing, setIsCategorizing] = useState(false);
 
   const allParentCategoriesFromContext = getParentCategories();
   const [currentSubcategories, setCurrentSubcategories] = useState<Category[]>([]);
@@ -329,8 +334,6 @@ export function TransactionForm({
           finalPayeeIdToSubmit = newPayee.id;
           toast({ title: "Beneficiario Añadido", description: `"${data.newPayeeName}" ha sido añadido a tu lista.` });
           setIsAddingNewPayee(false);
-          // The payee list in context will update, and the select will re-render.
-          // We might want to set the form's payeeId to the new ID for consistency if the form isn't immediately reset.
           form.setValue("payeeId", newPayee.id);
         } else {
           toast({ variant: "destructive", title: "Error", description: "No se pudo añadir el nuevo beneficiario." });
@@ -346,6 +349,44 @@ export function TransactionForm({
 
     const actualSubCategoryId = data.subCategoryId === NONE_SUBCATEGORY_VALUE ? undefined : data.subCategoryId;
     let finalCategoryId = (data.type === 'expense' || data.type === 'income') ? (actualSubCategoryId || data.parentCategoryId) : undefined;
+    
+    const needsAICategorization = data.type === 'expense' && finalCategoryId === DEFAULT_CATEGORY_ID;
+
+    if (needsAICategorization) {
+      setIsCategorizing(true);
+      try {
+        const payeeName = data.payeeId ? getPayeeName(data.payeeId) : undefined;
+        const aiInput = {
+          description: data.description,
+          payee: payeeName,
+          categories: categories.map(c => ({
+            id: c.id,
+            name: getCategoryName(c.id),
+            parentId: c.parentId || null,
+            isReserved: RESERVED_CATEGORY_IDS.includes(c.id),
+          }))
+        };
+        
+        const result = await categorizeExpense(aiInput);
+        if (result && result.suggestedCategoryId) {
+          finalCategoryId = result.suggestedCategoryId;
+          const suggestedCategoryName = getCategoryName(finalCategoryId);
+          toast({
+            title: "Categoría Sugerida por IA",
+            description: `Se ha asignado la categoría: "${suggestedCategoryName}".`
+          });
+        }
+      } catch (error) {
+        console.error("AI categorization failed:", error);
+        toast({
+          variant: "destructive",
+          title: "Error de IA",
+          description: "No se pudo sugerir una categoría. Se usará 'Sin Categoría'."
+        });
+      } finally {
+        setIsCategorizing(false);
+      }
+    }
 
     if (!finalCategoryId && (data.type === 'expense')) {
         finalCategoryId = DEFAULT_CATEGORY_ID;
@@ -845,11 +886,19 @@ export function TransactionForm({
         />
 
         {!isFieldDisabled && (
-          <Button type="submit" className="w-full">
-            {transactionToEdit ? "Actualizar Transacción" : "Añadir Transacción"}
+          <Button type="submit" className="w-full" disabled={isFieldDisabled || isCategorizing}>
+            {isCategorizing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Categorizando y Guardando...
+              </>
+            ) : (
+              transactionToEdit ? "Actualizar Transacción" : "Añadir Transacción"
+            )}
           </Button>
         )}
       </form>
     </Form>
   );
 }
+

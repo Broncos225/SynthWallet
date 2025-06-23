@@ -48,8 +48,14 @@ export async function categorizeExpense(input: ExpenseCategorizationInput): Prom
     };
   }
   
-  const { output } = await categorizeExpenseGenkitFlow({ ...input, categories: expenseCategories });
-  return output!;
+  const output = await categorizeExpenseGenkitFlow({ ...input, categories: expenseCategories });
+  // The flow itself provides a fallback, but we can add one here for extra safety against `undefined`.
+  return output || { 
+      suggestedCategoryId: null,
+      alternativeCategoryIds: [],
+      confidence: 0,
+      needsClarification: true,
+  };
 }
 
 const categorizeExpensePrompt = ai.definePrompt({
