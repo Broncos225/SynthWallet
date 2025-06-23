@@ -1,14 +1,5 @@
 
 import type {NextConfig} from 'next';
-// @ts-ignore - next-pwa may not have updated types for Next 15 yet, but functionally works
-import withPWA from 'next-pwa';
-
-const pwaConfig = {
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  // disable: process.env.NODE_ENV === 'development', // Consider enabling for local dev if caching is too aggressive
-};
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -28,6 +19,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    allowedDevOrigins: ["https://9000-firebase-studio-1747855010588.cluster-joak5ukfbnbyqspg4tewa33d24.cloudworkstations.dev"],
+  },
 };
 
-export default withPWA(pwaConfig)(nextConfig);
+export default nextConfig;
