@@ -350,9 +350,10 @@ export function TransactionForm({
     const actualSubCategoryId = data.subCategoryId === NONE_SUBCATEGORY_VALUE ? undefined : data.subCategoryId;
     let finalCategoryId = (data.type === 'expense' || data.type === 'income') ? (actualSubCategoryId || data.parentCategoryId) : undefined;
     
-    const needsAICategorization = data.type === 'expense' && finalCategoryId === DEFAULT_CATEGORY_ID;
+    const isEditingUncategorized = transactionToEdit && finalCategoryId === DEFAULT_CATEGORY_ID;
+    const isCreatingUncategorized = !transactionToEdit && data.type === 'expense' && finalCategoryId === DEFAULT_CATEGORY_ID;
 
-    if (needsAICategorization) {
+    if (isCreatingUncategorized || isEditingUncategorized) {
       setIsCategorizing(true);
       try {
         const payeeName = data.payeeId ? getPayeeName(data.payeeId) : undefined;
@@ -901,4 +902,3 @@ export function TransactionForm({
     </Form>
   );
 }
-

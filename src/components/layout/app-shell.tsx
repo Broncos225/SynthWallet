@@ -64,11 +64,6 @@ function ShellLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setHasMounted(true);
-
-    // next-pwa con register:true se encarga del registro del Service Worker.
-    // El registro manual se elimina para evitar conflictos y porque los problemas
-    // actuales (403/404 en manifests) impiden la activación correcta del SW.
-
   }, []);
 
   useEffect(() => {
@@ -227,4 +222,3 @@ function ShellLayout({ children }: { children: ReactNode }) {
     </>
   );
 }
-    

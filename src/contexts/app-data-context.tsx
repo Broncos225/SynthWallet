@@ -62,7 +62,7 @@ interface AppDataContextType {
   savingGoals: SavingGoal[];
   recurringTransactions: RecurringTransaction[];
   payees: Payee[];
-  transactionToPrefillFromRecurring: Partial<Transaction> | null;
+  transactionToPrefill: Partial<Transaction> | null;
   dataLoading: boolean;
   user: any;
 
@@ -126,7 +126,7 @@ interface AppDataContextType {
   deleteRecurringTransaction: (recurringId: string) => Promise<void>;
   getRecurringTransactionById: (recurringId: string) => RecurringTransaction | undefined;
   processRecurringTransactionAsDone: (recurringId: string, processedDate: string) => Promise<void>;
-  setTransactionToPrefillFromRecurring: Dispatch<SetStateAction<Partial<Transaction> | null>>;
+  setTransactionToPrefill: Dispatch<SetStateAction<Partial<Transaction> | null>>;
 
   addPayee: (payeeData: Omit<Payee, 'id'>) => Promise<Payee | null>;
   updatePayee: (updatedPayee: Payee) => Promise<void>;
@@ -200,7 +200,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [savingGoals, setSavingGoals] = useState<SavingGoal[]>([]);
   const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
   const [payees, setPayees] = useState<Payee[]>([]);
-  const [transactionToPrefillFromRecurring, setTransactionToPrefillFromRecurring] = useState<Partial<Transaction> | null>(null);
+  const [transactionToPrefill, setTransactionToPrefill] = useState<Partial<Transaction> | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   
   const [transactionPageFilters, setTransactionPageFilters] = useState<FilterState>(() =>
@@ -377,7 +377,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         setSavingGoals([]);
         setRecurringTransactions([]);
         setPayees([]);
-        setTransactionToPrefillFromRecurring(null);
+        setTransactionToPrefill(null);
         if (typeof window !== 'undefined') {
           window.localStorage.removeItem(LOCAL_STORAGE_FILTERS_KEY);
           window.localStorage.removeItem(LOCAL_STORAGE_APPLIED_FILTERS_KEY);
@@ -1305,7 +1305,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // --- Context Value ---
   const contextValue = useMemo(() => ({
     transactions, budgets, categories, expenseTemplates, accounts, debts, debtTransactions, themeSettings,
-    savingGoals, recurringTransactions, payees, transactionToPrefillFromRecurring, dataLoading, user,
+    savingGoals, recurringTransactions, payees, transactionToPrefill, dataLoading, user,
     transactionPageFilters, setTransactionPageFilters, transactionPageAppliedFilters, setTransactionPageAppliedFilters,
     addTransaction, updateTransaction, deleteTransaction,
     addBudget, updateBudget, deleteBudget,
@@ -1317,11 +1317,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     updateThemeSettings, formatUserCurrency,
     addSavingGoal, updateSavingGoal, deleteSavingGoal, getSavingGoalById, getSavingGoalByName, getSavingGoalName, getTransactionsForSavingGoal,
     addRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, getRecurringTransactionById, processRecurringTransactionAsDone,
-    setTransactionToPrefillFromRecurring,
+    setTransactionToPrefill,
     addPayee, updatePayee, deletePayee, getPayeeById, getPayeeName, getPayeeByName, isPayeeInUse,
   }), [
     transactions, budgets, categories, expenseTemplates, accounts, debts, debtTransactions, themeSettings,
-    savingGoals, recurringTransactions, payees, transactionToPrefillFromRecurring, dataLoading, user,
+    savingGoals, recurringTransactions, payees, transactionToPrefill, dataLoading, user,
     transactionPageFilters, setTransactionPageFilters, transactionPageAppliedFilters, setTransactionPageAppliedFilters,
     addTransaction, updateTransaction, deleteTransaction,
     addBudget, updateBudget, deleteBudget,
@@ -1333,7 +1333,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     updateThemeSettings, formatUserCurrency,
     addSavingGoal, updateSavingGoal, deleteSavingGoal, getSavingGoalById, getSavingGoalByName, getSavingGoalName, getTransactionsForSavingGoal,
     addRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, getRecurringTransactionById, processRecurringTransactionAsDone,
-    setTransactionToPrefillFromRecurring,
+    setTransactionToPrefill,
     addPayee, updatePayee, deletePayee, getPayeeById, getPayeeName, getPayeeByName, isPayeeInUse,
     transactionsBySavingGoal 
   ]);

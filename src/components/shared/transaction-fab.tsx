@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,28 +13,32 @@ import {
 import { TransactionForm } from '@/components/transactions/transaction-form';
 import { useAppData } from '@/contexts/app-data-context';
 import type { TransactionType, Transaction } from '@/types';
-import { Plus, X as CloseIcon, TrendingDown, TrendingUp, ArrowRightLeft } from 'lucide-react';
+import { Plus, X as CloseIcon, TrendingDown, TrendingUp, ArrowRightLeft, Mic } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
+import { extractTransactionDetails } from '@/ai/flows/extractTransactionDetails';
 
 export function TransactionFAB() {
   const {
-    transactionToPrefillFromRecurring,
-    setTransactionToPrefillFromRecurring,
+    transactionToPrefill,
+    setTransactionToPrefill,
   } = useAppData();
+  const { toast } = useToast();
 
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false);
   const [transactionTypeForModal, setTransactionTypeForModal] = useState<TransactionType | undefined>(undefined);
-  // FAB is for new transactions, so transactionToEdit is not needed here.
-  // transactionToPrefill will come from context.
+  
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    if (transactionToPrefillFromRecurring) {
-      console.log("TransactionFAB: useEffect detected transactionToPrefillFromRecurring:", transactionToPrefillFromRecurring);
-      setTransactionTypeForModal(transactionToPrefillFromRecurring.type);
+    if (transactionToPrefill) {
+      console.log("TransactionFAB: useEffect detected transactionToPrefill:", transactionToPrefill);
+      setTransactionTypeForModal(transactionToPrefill.type);
       setIsTransactionFormOpen(true);
     }
-  }, [transactionToPrefillFromRecurring]);
+  }, [transactionToPrefill]);
 
   const handleFabOptionClick = (type: TransactionType) => {
     console.log("TransactionFAB: FAB option clicked for type:", type);
@@ -42,22 +46,86 @@ export function TransactionFAB() {
     setIsTransactionFormOpen(true);
     setIsFabMenuOpen(false);
   };
+  
+  const handleVoiceInput = () => {
+    setIsFabMenuOpen(false);
+    
+    // @ts-ignore - webkitSpeechRecognition might not be in the default window type
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      toast({ variant: "destructive", title: "Navegador no compatible", description: "Tu navegador no soporta el reconocimiento de voz." });
+      return;
+    }
+
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'es-ES';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      toast({ title: "Escuchando...", description: "Habla ahora para registrar tu transacción.", duration: 5000 });
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event) => {
+      toast({ variant: "destructive", title: "Error de voz", description: `Ocurrió un error: ${event.error}` });
+      setIsListening(false);
+    };
+
+    recognition.onresult = async (event) => {
+      const transcript = event.results[0][0].transcript;
+      toast({ title: "Procesando...", description: `"${transcript}"` });
+      try {
+        const extractedData = await extractTransactionDetails(transcript);
+        
+        if (extractedData.errorReason) {
+            toast({ variant: "destructive", title: "No se pudo extraer la transacción", description: `Razón: ${extractedData.errorReason}`, duration: 8000 });
+        } else if (extractedData && (extractedData.amount || extractedData.description)) {
+          setTransactionToPrefill({
+            type: extractedData.type || 'expense', // Default to expense if not found
+            description: extractedData.description,
+            amount: extractedData.amount,
+            date: new Date().toISOString(), // Set date to now
+          });
+        } else {
+          toast({ variant: "destructive", title: "No se pudo entender", description: "La IA no devolvió detalles válidos. Inténtalo de nuevo con más detalles." });
+        }
+      } catch (error) {
+        console.error("Error calling AI flow for voice input:", error);
+        toast({ variant: "destructive", title: "Error de IA", description: "No se pudo procesar la solicitud." });
+      }
+    };
+
+    recognition.start();
+  };
+
 
   const handleTransactionFormSave = () => {
     setIsTransactionFormOpen(false);
     setTransactionTypeForModal(undefined);
-    if (transactionToPrefillFromRecurring) {
+    if (transactionToPrefill) {
       console.log("TransactionFAB: Clearing prefill data on transaction form save.");
-      setTransactionToPrefillFromRecurring(null);
+      setTransactionToPrefill(null);
     }
   };
 
   const handleTransactionDialogClose = () => {
     setIsTransactionFormOpen(false);
     setTransactionTypeForModal(undefined);
-    if (transactionToPrefillFromRecurring) {
+    if (transactionToPrefill) {
       console.log("TransactionFAB: Clearing prefill data on transaction dialog close.");
-      setTransactionToPrefillFromRecurring(null);
+      setTransactionToPrefill(null);
     }
   };
 
@@ -77,6 +145,17 @@ export function TransactionFAB() {
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
         {isFabMenuOpen && (
           <div className="flex flex-col items-end gap-3 mb-2 transition-all duration-300 ease-in-out">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="rounded-full shadow-lg w-auto pl-4 pr-5 py-3 h-auto bg-background hover:bg-muted text-foreground"
+              onClick={handleVoiceInput}
+              aria-label="Añadir por voz"
+              disabled={isListening}
+            >
+              <Mic className="mr-2 h-5 w-5 text-purple-500" />
+              {isListening ? "Escuchando..." : "Voz"}
+            </Button>
             <Button
               variant="secondary"
               size="lg"
@@ -131,7 +210,7 @@ export function TransactionFAB() {
           <ScrollArea className="flex-grow overflow-y-auto pr-6 -mr-6">
             <TransactionForm
               initialType={transactionTypeForModal}
-              transactionToPrefill={transactionToPrefillFromRecurring || undefined}
+              transactionToPrefill={transactionToPrefill || undefined}
               onSave={handleTransactionFormSave}
               dialogClose={handleTransactionDialogClose}
             />

@@ -40,7 +40,7 @@ export default function RecurringTransactionsPage() {
     deleteRecurringTransaction,
     dataLoading,
     processRecurringTransactionAsDone,
-    setTransactionToPrefillFromRecurring
+    setTransactionToPrefill
   } = useAppData();
 
   const recurringTransactions = Array.isArray(recurringTransactionsFromContext) ? recurringTransactionsFromContext : [];
@@ -100,11 +100,11 @@ export default function RecurringTransactionsPage() {
         type: record.type,
         categoryId: record.categoryId,
         accountId: record.accountId,
-        payee: record.payee,
+        payeeId: record.payeeId,
         date: record.nextDueDate, 
     };
     console.log("RecurringPage: Setting data to context for prefill:", prefillData);
-    setTransactionToPrefillFromRecurring(prefillData);
+    setTransactionToPrefill(prefillData);
 
     console.log("RecurringPage: Navigating to home page (/)");
     router.push('/'); // Navigate to dashboard where TransactionFAB will pick up the prefill
